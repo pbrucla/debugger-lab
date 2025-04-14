@@ -21,7 +21,7 @@ int main(int argc, char* argv[], char* envp[]) {
     std::vector<char*> args;
     args.push_back(progname);
     args.insert(args.end(), argv + 2, argv + argc);
-    args.push_back(NULL);
+    args.push_back(nullptr);
 
     try {
         dbg::spawn_process(progname, args.data(), envp);

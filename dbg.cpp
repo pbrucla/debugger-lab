@@ -55,7 +55,7 @@ void step_into() {
         std::cerr << "Cannot single step in stopped process\n";
         return;
     }
-    util::throw_errno(ptrace(PTRACE_SINGLESTEP, child_pid, NULL, NULL));
+    util::throw_errno(ptrace(PTRACE_SINGLESTEP, child_pid, nullptr, nullptr));
 }
 
 void read_memory(const void* addr, void* out, size_t sz) {
@@ -68,9 +68,9 @@ void read_memory(const void* addr, void* out, size_t sz) {
     for (size_t i = 0; i * sizeof(word) < sz; i++) {
         errno = 0;
         if (sz - i * sizeof(word) >= sizeof(word)) {
-            *out_addr = util::throw_errno(ptrace(PTRACE_PEEKDATA, child_pid, in_addr, NULL));
+            *out_addr = util::throw_errno(ptrace(PTRACE_PEEKDATA, child_pid, in_addr, nullptr));
         } else {
-            word out = util::throw_errno(ptrace(PTRACE_PEEKDATA, child_pid, in_addr, NULL));
+            word out = util::throw_errno(ptrace(PTRACE_PEEKDATA, child_pid, in_addr, nullptr));
             memcpy(out_addr, static_cast<void*>(&out), sz - i * sizeof(word));
         }
         out_addr++;
@@ -136,14 +136,14 @@ int continue_process() {
     // TODO: continue the child process, and wait for it to change state, storing the status in status
     if (WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP) {
         struct user_regs_struct regs;
-        util::throw_errno(ptrace(PTRACE_GETREGS, child_pid, NULL, &regs));
+        util::throw_errno(ptrace(PTRACE_GETREGS, child_pid, nullptr, &regs));
         regs.rip--;
         void* pc = reinterpret_cast<void*>(regs.rip);
         if (breakpoints.count(pc) > 0) {
             // we hit a breakpoint
             // TODO: restore the original memory at address pc
             breakpoint_bytes.erase(pc);
-            util::throw_errno(ptrace(PTRACE_SETREGS, child_pid, NULL, &regs));
+            util::throw_errno(ptrace(PTRACE_SETREGS, child_pid, nullptr, &regs));
         }
     }
     if (WIFEXITED(status) || WIFSIGNALED(status)) {
