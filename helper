@@ -1,0 +1,38 @@
+#!/bin/sh
+set -e
+
+function print_usage {
+    echo "Usage: $0 [init|build|format|run]" >&2
+    exit 1
+}
+
+if [ "$#" -lt 1 ]; then
+    print_usage
+fi
+
+subcmd="$1"
+shift
+
+case "$subcmd" in
+    init)
+        rm -rf build
+        meson setup build "$@"
+    ;;
+
+    build)
+        ninja -C build "$@"
+    ;;
+
+    format)
+        ninja -C build clang-format "$@"
+    ;;
+
+    run)
+        ninja --quiet -C build
+        ./build/cydbg "$@"
+    ;;
+
+    *)
+        print_usage
+    ;;
+esac
