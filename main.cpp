@@ -26,6 +26,9 @@ int main(int argc, char* argv[], char* envp[]) {
     try {
         dbg::spawn_process(progname, args.data(), envp);
         std::atexit(exit_handler);
+        unsigned long long x;
+        dbg::read_memory(reinterpret_cast<void*>(0x407008), &x, sizeof(x));
+        std::cout << "Read a value of: " << std::hex << x << std::dec << '\n';
         dbg::insert_breakpoint(reinterpret_cast<void*>(0x40106f));
         dbg::continue_process();
         std::cout << "Hit breakpoint. Press ENTER to continue." << std::endl;
