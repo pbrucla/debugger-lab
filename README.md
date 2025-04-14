@@ -14,3 +14,13 @@ The recommended order to fill out the TODOs is:
 1. The two in `spawn_process`
 2. The two in `continue_process`
 3. The one in `inject_breakpoint`
+
+## Finished Product
+If you've done everything correctly, when running `./helper run ./test`, you should immediately see:
+```
+First print
+Hit breakpoint. Press ENTER to continue.
+```
+Then, when you press enter, you should immediately see `Second print`, and then after a 1 second delay, `Third print: 1234567812345678`.
+
+Afterwards, it should immediately display `Got exit code 0.`.
