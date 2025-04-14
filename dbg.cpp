@@ -6,8 +6,8 @@
 #include <stdint.h>
 #include <string.h>
 #include <sys/ptrace.h>
-#include <sys/wait.h>
 #include <sys/user.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 #include <iostream>
@@ -121,7 +121,7 @@ void spawn_process(const char* pathname, char* const argv[], char* const envp[])
         // parent
         child_pid = pid;
         // TODO: wait for the child's SIGTRAP to signify the execve having run
-        for (const void* addr: breakpoints) {
+        for (const void* addr : breakpoints) {
             inject_breakpoint(addr);
         }
     }
@@ -137,7 +137,7 @@ int continue_process() {
     if (WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP) {
         struct user_regs_struct regs;
         util::throw_errno(ptrace(PTRACE_GETREGS, child_pid, NULL, &regs));
-        regs.rip --;
+        regs.rip--;
         void* pc = reinterpret_cast<void*>(regs.rip);
         if (breakpoints.count(pc) > 0) {
             // we hit a breakpoint
