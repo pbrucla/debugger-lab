@@ -28,7 +28,7 @@ case "$subcmd" in
     ;;
 
     run)
-        ninja --quiet -C build
+        ninja -C build >/dev/null
         ./build/cydbg "$@"
     ;;
 
