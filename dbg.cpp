@@ -105,7 +105,10 @@ static void inject_breakpoint(const void* addr) {
     if (breakpoint_bytes.count(addr) > 0) {
         return;
     }
-    // TODO: inject the breakpoint into address addr, and store the original memory value in breakpoint_bytes
+    uint8_t prev_byte;
+    read_memory(addr, &prev_byte, 1);
+    write_memory(addr, "\xcc", 1);
+    breakpoint_bytes[addr] = prev_byte;
 }
 
 void spawn_process(const char* pathname, char* const argv[], char* const envp[]) {
@@ -116,11 +119,14 @@ void spawn_process(const char* pathname, char* const argv[], char* const envp[])
     pid_t pid = util::throw_errno(fork());
     if (pid == 0) {
         // child
-        // TODO: start tracing and then execve the new process
+        util::throw_errno(ptrace(PTRACE_TRACEME, 0, nullptr, nullptr));
+        util::throw_errno(execve(pathname, argv, envp));
     } else {
         // parent
         child_pid = pid;
-        // TODO: wait for the child's SIGTRAP to signify the execve having run
+        int status;
+        util::throw_errno(waitpid(child_pid, &status, 0));
+        assert(WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP);
         for (const void* addr : breakpoints) {
             inject_breakpoint(addr);
         }
@@ -133,7 +139,8 @@ int continue_process() {
         return 0;
     }
     int status;
-    // TODO: continue the child process, and wait for it to change state, storing the status in status
+    util::throw_errno(ptrace(PTRACE_CONT, child_pid, NULL, NULL));
+    util::throw_errno(waitpid(child_pid, &status, 0));
     if (WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP) {
         struct user_regs_struct regs;
         util::throw_errno(ptrace(PTRACE_GETREGS, child_pid, nullptr, &regs));
@@ -141,7 +148,7 @@ int continue_process() {
         void* pc = reinterpret_cast<void*>(regs.rip);
         if (breakpoints.count(pc) > 0) {
             // we hit a breakpoint
-            // TODO: restore the original memory at address pc
+            write_memory(pc, &breakpoint_bytes.at(pc), 1);
             breakpoint_bytes.erase(pc);
             util::throw_errno(ptrace(PTRACE_SETREGS, child_pid, nullptr, &regs));
         }
