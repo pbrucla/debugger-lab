@@ -16,32 +16,37 @@
 
 #include "util.hpp"
 
-static constexpr int NOCHILD = -1;
 using word = unsigned long;
 
-static pid_t child_pid = NOCHILD;
-static std::unordered_set<const void*> breakpoints;
-static std::unordered_map<const void*, uint8_t> breakpoint_bytes;
+Breakpoint::Breakpoint(size_t addr) : addr(addr), injected(false), orig_byte(0) {}
 
-namespace dbg {
-int wait_process_exit() {
-    if (child_pid == NOCHILD) {
-        return 0;
-    }
-    while (1) {
-        int status;
-        util::throw_errno(waitpid(child_pid, &status, 0));
-        if (WIFEXITED(status)) {
-            child_pid = NOCHILD;
-            return WEXITSTATUS(status);
-        } else if (WIFSIGNALED(status)) {
-            child_pid = NOCHILD;
-            return WTERMSIG(status);
-        }
+Tracee::Tracee() {}
+Tracee::~Tracee() {
+    try {
+        Tracee::kill_process();
+    } catch (const std::system_error&) {
     }
 }
 
-void kill_process(int sgn) {
+void Tracee::inject_breakpoint(Breakpoint& bp) {
+    if (bp.injected) {
+        return;
+    }
+    read_memory(bp.addr, &bp.orig_byte, 1);
+    uint8_t new_byte = 0xcc;
+    write_memory(bp.addr, &new_byte, 1);
+    bp.injected = true;
+}
+
+void Tracee::uninject_breakpoint(Breakpoint& bp) {
+    if (!bp.injected) {
+        return;
+    }
+    write_memory(bp.addr, &bp.orig_byte, 1);
+    bp.injected = false;
+}
+
+void Tracee::kill_process(int sgn) {
     if (child_pid == NOCHILD) {
         return;
     }
@@ -50,7 +55,7 @@ void kill_process(int sgn) {
     }
 }
 
-void step_into() {
+void Tracee::step_into() {
     if (child_pid == NOCHILD) {
         std::cerr << "Cannot single step in stopped process\n";
         return;
@@ -58,12 +63,12 @@ void step_into() {
     util::throw_errno(ptrace(PTRACE_SINGLESTEP, child_pid, nullptr, nullptr));
 }
 
-void read_memory(const void* addr, void* out, size_t sz) {
+void Tracee::read_memory(size_t addr, void* out, size_t sz) {
     if (child_pid == NOCHILD) {
         std::cerr << "Cannot read memory in stopped process\n";
         return;
     }
-    const word* in_addr = static_cast<const word*>(addr);
+    const word* in_addr = reinterpret_cast<const word*>(addr);
     word* out_addr = static_cast<word*>(out);
     for (size_t i = 0; i * sizeof(word) < sz; i++) {
         errno = 0;
@@ -78,19 +83,19 @@ void read_memory(const void* addr, void* out, size_t sz) {
     }
 }
 
-void write_memory(const void* addr, const void* data, size_t sz) {
+void Tracee::write_memory(size_t addr, const void* data, size_t sz) {
     if (child_pid == NOCHILD) {
         std::cerr << "Cannot write memory in stopped process\n";
         return;
     }
     const word* in_addr = static_cast<const word*>(data);
-    const word* out_addr = static_cast<const word*>(addr);
+    const word* out_addr = reinterpret_cast<const word*>(addr);
     for (size_t i = 0; i * sizeof(word) < sz; i++) {
         if (sz - i * sizeof(word) >= sizeof(word)) {
             util::throw_errno(ptrace(PTRACE_POKEDATA, child_pid, out_addr, *in_addr));
         } else {
             word val;
-            read_memory(out_addr, &val, sizeof(val));
+            read_memory(reinterpret_cast<size_t>(out_addr), &val, sizeof(val));
             memcpy(&val, in_addr, sz - i * sizeof(word));
             util::throw_errno(ptrace(PTRACE_POKEDATA, child_pid, out_addr, val));
         }
@@ -99,19 +104,7 @@ void write_memory(const void* addr, const void* data, size_t sz) {
     }
 }
 
-// Injects a breakpoint into a running child process.
-static void inject_breakpoint(const void* addr) {
-    // don't inject breakpoint if it's already injected
-    if (breakpoint_bytes.count(addr) > 0) {
-        return;
-    }
-    uint8_t prev_byte;
-    read_memory(addr, &prev_byte, 1);
-    write_memory(addr, "\xcc", 1);
-    breakpoint_bytes[addr] = prev_byte;
-}
-
-void spawn_process(const char* pathname, char* const argv[], char* const envp[]) {
+void Tracee::spawn_process(const char* pathname, char* const argv[], char* const envp[]) {
     if (child_pid != NOCHILD) {
         kill_process();
         wait_process_exit();
@@ -127,13 +120,13 @@ void spawn_process(const char* pathname, char* const argv[], char* const envp[])
         int status;
         util::throw_errno(waitpid(child_pid, &status, 0));
         assert(WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP);
-        for (const void* addr : breakpoints) {
-            inject_breakpoint(addr);
+        for (auto& p : breakpoints) {
+            inject_breakpoint(p.second);
         }
     }
 }
 
-int continue_process() {
+int Tracee::continue_process() {
     if (child_pid == NOCHILD) {
         std::cerr << "Cannot continue stopped process\n";
         return 0;
@@ -145,11 +138,10 @@ int continue_process() {
         struct user_regs_struct regs;
         util::throw_errno(ptrace(PTRACE_GETREGS, child_pid, nullptr, &regs));
         regs.rip--;
-        void* pc = reinterpret_cast<void*>(regs.rip);
+        size_t pc = regs.rip;
         if (breakpoints.count(pc) > 0) {
             // we hit a breakpoint
-            write_memory(pc, &breakpoint_bytes.at(pc), 1);
-            breakpoint_bytes.erase(pc);
+            uninject_breakpoint(breakpoints.at(pc));
             util::throw_errno(ptrace(PTRACE_SETREGS, child_pid, nullptr, &regs));
         }
     }
@@ -159,10 +151,27 @@ int continue_process() {
     return status;
 }
 
-void insert_breakpoint(const void* addr) {
-    breakpoints.insert(addr);
+void Tracee::insert_breakpoint(size_t addr) {
+    auto [it, _] = breakpoints.emplace(addr, addr);
+    Breakpoint& bp = it->second;
     if (child_pid != NOCHILD) {
-        inject_breakpoint(addr);
+        inject_breakpoint(bp);
     }
 }
-}  // namespace dbg
+
+int Tracee::wait_process_exit() {
+    if (child_pid == NOCHILD) {
+        return 0;
+    }
+    while (1) {
+        int status;
+        util::throw_errno(waitpid(child_pid, &status, 0));
+        if (WIFEXITED(status)) {
+            child_pid = NOCHILD;
+            return WEXITSTATUS(status);
+        } else if (WIFSIGNALED(status)) {
+            child_pid = NOCHILD;
+            return WTERMSIG(status);
+        }
+    }
+}

@@ -10,6 +10,7 @@ if [ "$#" -lt 1 ]; then
     print_usage
 fi
 
+cmdname="$0"
 subcmd="$1"
 shift
 
@@ -28,8 +29,13 @@ case "$subcmd" in
     ;;
 
     run)
-        ninja -C build >/dev/null
-        ./build/cydbg "$@"
+        if ! (ninja -C build >/dev/null); then
+            echo "Build failed. Rebuilding to generate error messages."
+            ninja -C build
+            exit 1
+        else
+            ./build/cydbg "$@"
+        fi
     ;;
 
     *)
