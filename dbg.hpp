@@ -2,11 +2,12 @@
 
 #include <signal.h>
 #include <stdint.h>
-#include <unordered_set>
+
 #include <unordered_map>
+#include <unordered_set>
 
 class Breakpoint {
-public:
+   public:
     size_t addr;
     bool injected;
     uint8_t orig_byte;
