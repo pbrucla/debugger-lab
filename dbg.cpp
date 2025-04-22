@@ -147,7 +147,7 @@ int Tracee::continue_process() {
             inject_breakpoint(it->second);
         }
     }
-    
+
     util::throw_errno(ptrace(PTRACE_CONT, child_pid, NULL, NULL));
     util::throw_errno(waitpid(child_pid, &status, 0));
     if (WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP) {
