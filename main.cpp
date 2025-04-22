@@ -3,8 +3,8 @@
 #include <cstdlib>
 #include <iostream>
 #include <vector>
-
 #include "dbg.hpp"
+#include <readline/readline.h> // if you have issues, consider installing readline-dev or readline-devel
 
 unsigned long long int x = 0x1337133713371337ULL;
 
