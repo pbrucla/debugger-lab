@@ -9,6 +9,7 @@
 #include <sys/user.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <array>
 
 #include <iostream>
 #include <unordered_map>
@@ -176,7 +177,7 @@ int Tracee::wait_process_exit() {
     }
 }
 
-void Tracee::syscall(const int syscall, unsigned long const args[]){
+void Tracee::syscall(const int syscall, const std::array<unsigned long,6>& args){
     // read registers
     struct user_regs_struct regs;
     ptrace(PTRACE_GETREGS, child_pid, nullptr, &regs);
