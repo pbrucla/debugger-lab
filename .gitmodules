@@ -1,0 +1,3 @@
+[submodule "subprojects/LIEF"]
+	path = subprojects/LIEF
+	url = https://github.com/lief-project/LIEF/
