@@ -47,4 +47,17 @@ class Tracee {
     void write_memory(size_t addr, const void* data, size_t sz);
     // Inserts a breakpoint at address `addr` in the child process.
     void insert_breakpoint(size_t addr);
+
+
+    /* Syscall insertion (clobber rcx, r11)
+    args[0] = %rdi
+    args[1] = %rsi
+    args[2] = %rdx
+    args[3] = %r10
+    args[4] = %r8
+    args[5] = %r9
+    
+    MUST PASS 6 UNSIGNED LONGS - FILL EXTRA REGISTERS WITH JUNK VALUES IF NECESSARY
+    */
+    void syscall(const int syscall, unsigned long const args[]);
 };
