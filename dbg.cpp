@@ -62,6 +62,9 @@ void Tracee::step_into() {
         return;
     }
     util::throw_errno(ptrace(PTRACE_SINGLESTEP, child_pid, nullptr, nullptr));
+    int status;
+    util::throw_errno(waitpid(child_pid, &status, 0));
+    assert(WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP);
 }
 
 void Tracee::read_memory(size_t addr, void* out, size_t sz) {
@@ -132,22 +135,20 @@ int Tracee::continue_process() {
         std::cerr << "Cannot continue stopped process\n";
         return 0;
     }
-    
-    int status;
-    if(breakpoint_hit)
-    {
-        struct user_regs_struct regs;
-        printf("before getregs\n");
-        util::throw_errno(ptrace(PTRACE_GETREGS, child_pid, nullptr, &regs));
-        printf("after getregs\n");
-        size_t pc = regs.rip;
-        printf("before step\n");
-        step_into();
-        printf("after step\n");
-        insert_breakpoint(pc);
-        breakpoint_hit = false;
-    }
 
+    int status;
+    if (breakpoint_hit) {
+        struct user_regs_struct regs;
+        util::throw_errno(ptrace(PTRACE_GETREGS, child_pid, nullptr, &regs));
+        size_t pc = regs.rip;
+        auto it = breakpoints.find(pc);
+        breakpoint_hit = false;
+        if (it != breakpoints.end()) {
+            step_into();
+            inject_breakpoint(it->second);
+        }
+    }
+    
     util::throw_errno(ptrace(PTRACE_CONT, child_pid, NULL, NULL));
     util::throw_errno(waitpid(child_pid, &status, 0));
     if (WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP) {
@@ -163,12 +164,16 @@ int Tracee::continue_process() {
         }
     }
     if (WIFEXITED(status) || WIFSIGNALED(status)) {
+        std::cerr << "process exited\n";
         child_pid = NOCHILD;
     }
     return status;
 }
 
 void Tracee::insert_breakpoint(size_t addr) {
+    if (breakpoints.count(addr) > 0) {
+        return;
+    }
     auto [it, _] = breakpoints.emplace(addr, addr);
     Breakpoint& bp = it->second;
     if (child_pid != NOCHILD) {
