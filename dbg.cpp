@@ -177,17 +177,20 @@ int Tracee::wait_process_exit() {
 }
 
 void Tracee::syscall(const int syscall, unsigned long const args[]){
+    // read registers
     struct user_regs_struct regs;
     ptrace(PTRACE_GETREGS, child_pid, nullptr, &regs);
     //inject syscall
-    unsigned long instruction_ptr_addr = regs->ip;
-    void* instruction = nullptr;
-    read_memory(instruction_ptr_addr, instruction, 2);
+    unsigned long instruction_ptr_addr = regs.ip;
+    
+    int instruction = nullptr; // old value at memory
+    read_memory(instruction_ptr_addr, &instruction, 2);
     int syscall_code = 0x0f05;
-    write_memory(instruction_ptr_addr, &syscall_code, 2);
-    //set regs appropriately
-    //idk how to do this tbh
+    write_memory(instruction_ptr_addr, &syscall_code, 2); // overwrite to be syscall
+
+    // set regs appropriately
     int num_args = sizeof(args)/sizeof(unsigned long);
     // set regs (INTERFACE UNAVAILABLE)
+    write_memory(instruction_ptr_addr, &instruction, 2); // restore instruction
     ptrace(PTRACE_SETREGS, child_pid, nullptr, &regs);
 }
