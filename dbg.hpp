@@ -6,6 +6,8 @@
 #include <unordered_map>
 #include <unordered_set>
 
+#include <string>
+
 class Breakpoint {
    public:
     size_t addr;
@@ -47,4 +49,139 @@ class Tracee {
     void write_memory(size_t addr, const void* data, size_t sz);
     // Inserts a breakpoint at address `addr` in the child process.
     void insert_breakpoint(size_t addr);
+    
+    long read_register(Register reg, int size);
+
+    void write_register(Register reg, long value);
 };
+
+enum Register {
+    R15,
+    R14,
+    R13,
+    R12,
+    RBP,
+    RBX,
+    R11,
+    R10,
+    R9,
+    R8,
+    RAX,
+    RCX,
+    RDX,
+    RSI,
+    RDI,
+    ORIG_RAX,
+    RIP,
+    CS,
+    EFLAGS,
+    RSP,
+    SS,
+    FS_BASE,
+    GS_BASE,
+    DS,
+    ES,
+    FS,
+    GS,
+};
+
+
+Register string_to_register(const std::string& name) {
+    static const std::unordered_map<std::string, Register> reg_map = {
+        {"r15", R15},
+        {"r14", R14},
+        {"r13", R13},
+        {"r12", R12},
+        {"rbp", RBP},
+        {"rbx", RBX},
+        {"r11", R11},
+        {"r10", R10},
+        {"r9", R9},
+        {"r8", R8},
+        {"rax", RAX},
+        {"rcx", RCX},
+        {"rdx", RDX},
+        {"rsi", RSI},
+        {"rdi", RDI},
+        {"orig_rax", ORIG_RAX},
+        {"rip", RIP},
+        {"cs", CS},
+        {"eflags", EFLAGS},
+        {"rsp", RSP},
+        {"ss", SS},
+        {"fs_base", FS_BASE},
+        {"gs_base", GS_BASE},
+        {"ds", DS},
+        {"es", ES},
+        {"fs", FS},
+        {"gs", GS}
+    };
+
+    auto it = reg_map.find(name);
+    if (it == reg_map.end()) {
+        throw std::invalid_argument("Unknown register name: " + name);
+    }
+    return it->second;
+}
+
+std::string register_to_string(Register reg) {
+    switch (reg) {
+        case R15:
+            return "r15";
+        case R14:
+            return "r14";
+        case R13:
+            return "r13";
+        case R12:
+            return "r12";
+        case RBP:
+            return "rbp";
+        case RBX:
+            return "rbx";
+        case R11:
+            return "r11";
+        case R10:
+            return "r10";
+        case R9: 
+            return "r9";
+        case R8: 
+            return "r8";
+        case RAX:
+            return "rax";
+        case RCX:
+            return "rcx";
+        case RDX:
+            return "rdx";
+        case RSI:
+            return "rsi";
+        case RDI:
+            return "rdi";
+        case ORIG_RAX:
+            return "orig_rax";
+        case RIP:
+            return "rip";
+        case CS: 
+            return "cs";
+        case EFLAGS:
+            return "eflags";
+        case RSP:
+            return "rsp";
+        case SS: 
+            return "ss";
+        case FS_BASE:
+            return "fs_base";
+        case GS_BASE:
+            return "gs_base";
+        case DS: 
+            return "ds";
+        case ES: 
+            return "es";
+        case FS: 
+            return "fs";
+        case GS: 
+            return "gs";
+        default: 
+            return "unknown";
+    }
+}
+
