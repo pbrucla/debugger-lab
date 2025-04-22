@@ -131,7 +131,22 @@ int Tracee::continue_process() {
         std::cerr << "Cannot continue stopped process\n";
         return 0;
     }
+    
     int status;
+    if(breakpoint_hit)
+    {
+        struct user_regs_struct regs;
+        printf("before getregs\n");
+        util::throw_errno(ptrace(PTRACE_GETREGS, child_pid, nullptr, &regs));
+        printf("after getregs\n");
+        size_t pc = regs.rip;
+        printf("before step\n");
+        step_into();
+        printf("after step\n");
+        insert_breakpoint(pc);
+        breakpoint_hit = false;
+    }
+
     util::throw_errno(ptrace(PTRACE_CONT, child_pid, NULL, NULL));
     util::throw_errno(waitpid(child_pid, &status, 0));
     if (WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP) {
@@ -141,6 +156,7 @@ int Tracee::continue_process() {
         size_t pc = regs.rip;
         if (breakpoints.count(pc) > 0) {
             // we hit a breakpoint
+            breakpoint_hit = true;
             uninject_breakpoint(breakpoints.at(pc));
             util::throw_errno(ptrace(PTRACE_SETREGS, child_pid, nullptr, &regs));
         }
