@@ -182,9 +182,9 @@ void Tracee::syscall(const int syscall, const std::array<unsigned long,6>& args)
     struct user_regs_struct regs;
     ptrace(PTRACE_GETREGS, child_pid, nullptr, &regs);
     //inject syscall
-    unsigned long instruction_ptr_addr = regs.ip;
+    unsigned long instruction_ptr_addr = regs.rip;
     
-    int instruction = nullptr; // old value at memory
+    int instruction = 0; // old value at memory
     read_memory(instruction_ptr_addr, &instruction, 2);
     int syscall_code = 0x0f05;
     write_memory(instruction_ptr_addr, &syscall_code, 2); // overwrite to be syscall
