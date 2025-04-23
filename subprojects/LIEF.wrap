@@ -1,0 +1,6 @@
+[wrap-git]
+url = https://github.com/lief-project/LIEF.git
+revision = 0.16.5
+depth = 1
+patch_directory = LIEF
+diff_files = LIEF.patch

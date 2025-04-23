@@ -1,0 +1,12 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 4aa9037..a25d5ca 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -116,7 +116,6 @@ message(STATUS "CMAKE_MSVC_RUNTIME_LIBRARY:        ${CMAKE_MSVC_RUNTIME_LIBRARY}
+ if(LIEF_INSTALL)
+   if(UNIX)
+     include(GNUInstallDirs)
+-    set(CMAKE_INSTALL_LIBDIR "lib")
+   else()
+     set(CMAKE_INSTALL_LIBDIR      "lib")
+     set(CMAKE_INSTALL_DATADIR     "share")
