@@ -16,13 +16,9 @@ proj = ext.add_project('cmake_wrapper.sh',
                       '-DLIEF_ART=OFF',
                       '-DLIEF_OAT=OFF',
                       '-DLIEF_VDEX=OFF',
-                      # These options are inverted for some reason
-                      '-DLIEF_OBJC=ON',
-                      '-DLIEF_DYLD_SHARED_CACHE=ON',
-                      '-DLIEF_ASM=ON',
                       '-DCMAKE_INSTALL_PREFIX=@PREFIX@',
-                      '-DCMAKE_INSTALL_INCLUDEDIR=@PREFIX@/@INCLUDEDIR@',
-                      '-DCMAKE_INSTALL_LIBDIR=@PREFIX@/@LIBDIR@'
+                      '-DCMAKE_INSTALL_INCLUDEDIR=@INCLUDEDIR@',
+                      '-DCMAKE_INSTALL_LIBDIR=@LIBDIR@'
                      ],
   verbose: true
 )
