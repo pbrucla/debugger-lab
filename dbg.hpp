@@ -50,9 +50,9 @@ class Tracee {
     // Inserts a breakpoint at address `addr` in the child process.
     void insert_breakpoint(size_t addr);
     
-    long read_register(Register reg, int size);
+    uint64_t read_register(Register reg, int size);
 
-    void write_register(Register reg, long value);
+    void write_register(Register reg, int size, uint64_t value);
 };
 
 enum Register {
@@ -123,65 +123,3 @@ Register string_to_register(const std::string& name) {
     }
     return it->second;
 }
-
-std::string register_to_string(Register reg) {
-    switch (reg) {
-        case R15:
-            return "r15";
-        case R14:
-            return "r14";
-        case R13:
-            return "r13";
-        case R12:
-            return "r12";
-        case RBP:
-            return "rbp";
-        case RBX:
-            return "rbx";
-        case R11:
-            return "r11";
-        case R10:
-            return "r10";
-        case R9: 
-            return "r9";
-        case R8: 
-            return "r8";
-        case RAX:
-            return "rax";
-        case RCX:
-            return "rcx";
-        case RDX:
-            return "rdx";
-        case RSI:
-            return "rsi";
-        case RDI:
-            return "rdi";
-        case ORIG_RAX:
-            return "orig_rax";
-        case RIP:
-            return "rip";
-        case CS: 
-            return "cs";
-        case EFLAGS:
-            return "eflags";
-        case RSP:
-            return "rsp";
-        case SS: 
-            return "ss";
-        case FS_BASE:
-            return "fs_base";
-        case GS_BASE:
-            return "gs_base";
-        case DS: 
-            return "ds";
-        case ES: 
-            return "es";
-        case FS: 
-            return "fs";
-        case GS: 
-            return "gs";
-        default: 
-            return "unknown";
-    }
-}
-

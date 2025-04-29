@@ -176,7 +176,7 @@ int Tracee::wait_process_exit() {
     }
 }
 
-unsigned long long& get_register_ref(user_regs_struct& regs, Register reg) {
+uint64_t& get_register_ref(user_regs_struct& regs, Register reg) {
     switch (reg) {
         case R15:
             return regs.r15;
@@ -237,30 +237,58 @@ unsigned long long& get_register_ref(user_regs_struct& regs, Register reg) {
     }
 }
 
-long Tracee::read_register(Register reg, int size) {
+uint64_t Tracee::read_register(Register reg, int size) {
     struct user_regs_struct regs;
     if (ptrace(PTRACE_GETREGS, child_pid, nullptr, &regs) == -1) {
         perror("ptrace(PTRACE_GETREGS)");
         throw std::runtime_error("Failed to get registers");
     }
-    unsigned long long& value = get_register_ref(regs, reg);
+    uint64_t& value = get_register_ref(regs, reg);
     
-
+    switch (size) { // size is in bytes
+        case 1: // 1 byte
+            return value & 0xFF;
+        case 2: // 2 bytes
+            return value & 0xFFFF;
+        case 4: // 4 bytes
+            return value & 0xFFFFFFFF;
+        case 8: // 8 bytes (full register)
+            return value;
+        default:
+            throw std::runtime_error("Unsupported register size");
+    }
 }
 
-// void Tracee::write_register(Register reg, int size) {
-//     struct user_regs_struct regs;
-//     if (ptrace(PTRACE_GETREGS, child_pid, nullptr, &regs) == -1) {
-//         perror("ptrace(PTRACE_GETREGS)");
-//         throw std::runtime_error("Failed to get registers");
-//     }
+void Tracee::write_register(Register reg, int size, uint64_t value) {
+    struct user_regs_struct regs;
+    if (ptrace(PTRACE_GETREGS, child_pid, nullptr, &regs) == -1) {
+        perror("ptrace(PTRACE_GETREGS)");
+        throw std::runtime_error("Failed to get registers");
+    }
+    
+    uint64_t& full_register = get_register_ref(regs, reg);
 
-//     get_register_ref(regs, reg) = value;
-
-//     if (ptrace(PTRACE_SETREGS, child_pid, nullptr, &regs) == -1) {
-//         perror("ptrace(PTRACE_SETREGS)");
-//         throw std::runtime_error("Failed to set registers");
-//     }
-// }
+     switch (size) { // size is in bytes
+        case 1: // 1 byte
+            full_register = (full_register & ~0xFF) | (value & 0xFF);
+            break;
+        case 2: // 2 bytes
+            full_register = (full_register & ~0xFFFF) | (value & 0xFFFF);
+            break;
+        case 4: // 4 bytes
+            full_register = (full_register & ~0xFFFFFFFF) | (value & 0xFFFFFFFF);
+            break;
+        case 8: // 8 bytes (full register)
+            full_register = value;
+            break;
+        default:
+            throw std::runtime_error("Unsupported register size");
+    }
+    
+    if (ptrace(PTRACE_SETREGS, child_pid, nullptr, &regs) == -1) {
+        perror("ptrace(PTRACE_SETREGS)");
+        throw std::runtime_error("Failed to set registers");
+    }
+}
 
 
