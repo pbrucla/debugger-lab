@@ -290,39 +290,3 @@ void Tracee::write_register(Register reg, int size, uint64_t value) {
         throw std::runtime_error("Failed to set registers");
     }
 }
-
-const std::unordered_map<std::string, Register> reg_map = {{"r15", R15},
-                                                           {"r14", R14},
-                                                           {"r13", R13},
-                                                           {"r12", R12},
-                                                           {"rbp", RBP},
-                                                           {"rbx", RBX},
-                                                           {"r11", R11},
-                                                           {"r10", R10},
-                                                           {"r9", R9},
-                                                           {"r8", R8},
-                                                           {"rax", RAX},
-                                                           {"rcx", RCX},
-                                                           {"rdx", RDX},
-                                                           {"rsi", RSI},
-                                                           {"rdi", RDI},
-                                                           {"orig_rax", ORIG_RAX},
-                                                           {"rip", RIP},
-                                                           {"cs", CS},
-                                                           {"eflags", EFLAGS},
-                                                           {"rsp", RSP},
-                                                           {"ss", SS},
-                                                           {"fs_base", FS_BASE},
-                                                           {"gs_base", GS_BASE},
-                                                           {"ds", DS},
-                                                           {"es", ES},
-                                                           {"fs", FS},
-                                                           {"gs", GS}};
-
-Register string_to_register(const std::string& name) {
-    auto it = reg_map.find(name);
-    if (it == reg_map.end()) {
-        throw std::invalid_argument("Unknown register name: " + name);
-    }
-    return it->second;
-}
