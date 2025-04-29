@@ -36,6 +36,11 @@ int main(int argc, char* argv[], char* envp[]) {
         std::cout << "Hit breakpoint. Press ENTER to continue." << std::endl;
         std::cin.get();
         proc.continue_process();
+        std::cout << "Going to try to syscall" << std::endl;
+        char* a = "ab\n";
+        unsigned long ab = (unsigned long) a;
+        std::array<unsigned long, 6> b= {{1, ab, 3,0,0,0}};
+        proc.syscall(1, b);
         std::cout << "Hit breakpoint. Press ENTER to continue." << std::endl;
         std::cin.get();
         proc.continue_process();

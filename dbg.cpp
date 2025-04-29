@@ -211,8 +211,22 @@ void Tracee::syscall(const int syscall, const std::array<unsigned long,6>& args)
     write_memory(instruction_ptr_addr, &syscall_code, 2); // overwrite to be syscall
 
     // set regs appropriately
-    int num_args = sizeof(args)/sizeof(unsigned long);
     // set regs (INTERFACE UNAVAILABLE)
+    struct user_regs_struct syscall_regs = regs;
+    syscall_regs.rax = syscall;
+    syscall_regs.rdi = args[0];
+    syscall_regs.rsi = args[1];
+    syscall_regs.rdx = args[2];
+    syscall_regs.r10 = args[3];
+    syscall_regs.r8 = args[4];
+    syscall_regs.r9 = args[5];
+    ptrace(PTRACE_SETREGS, child_pid, nullptr, &syscall_regs);
+
+    step_into(); // actually run the syscall
+    std::cout << "ewueirhg\n";
+    std::cout << instruction << std::endl;
+
     write_memory(instruction_ptr_addr, &instruction, 2); // restore instruction
+    std::cout << "Dfiglerghlk\n";
     ptrace(PTRACE_SETREGS, child_pid, nullptr, &regs);
 }
