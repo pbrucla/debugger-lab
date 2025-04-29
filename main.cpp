@@ -25,10 +25,16 @@ int main(int argc, char* argv[], char* envp[]) {
 
     try {
         proc.spawn_process(progname, args.data(), envp);
-        unsigned long long x;
-        proc.read_memory(0x407008, &x, sizeof(x));
-        std::cout << "Read a value of: " << std::hex << x << std::dec << '\n';
-        proc.insert_breakpoint(0x40106f);
+        //    unsigned long long x;
+        // proc.read_memory(0x407008, &x, sizeof(x));
+        //     std::cout << "Read a value of: " << std::hex << x << std::dec << '\n';
+        proc.insert_breakpoint(0x4011c0);
+        proc.continue_process();
+        std::cout << "Hit breakpoint. Press ENTER to continue." << std::endl;
+        std::cin.get();
+        proc.continue_process();
+        std::cout << "Hit breakpoint. Press ENTER to continue." << std::endl;
+        std::cin.get();
         proc.continue_process();
         std::cout << "Hit breakpoint. Press ENTER to continue." << std::endl;
         std::cin.get();
