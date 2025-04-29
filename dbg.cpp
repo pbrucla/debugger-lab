@@ -9,6 +9,7 @@
 #include <sys/user.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <capstone/capstone.h>
 
 #include <iostream>
 #include <unordered_map>
@@ -173,5 +174,32 @@ int Tracee::wait_process_exit() {
             child_pid = NOCHILD;
             return WTERMSIG(status);
         }
+    }
+}
+
+int Tracee::disassemble(int lineNumber, size_t address, cs_insn** disassembledInstructions){
+    csh handle;
+    cs_open(CS_ARCH_X86, CS_MODE_32, &handle);
+
+    cs_insn *insn;
+    
+    word* val;
+    ubtye *CODE = (ubtye *)malloc(16*lineNumber);
+    size_t i;
+    for (i=0; i < 16*lineNumber; i++) {
+        read_memory(reinterpret_cast<size_t>(address), &val, sizeof(val));
+        *(CODE+i) = *val;
+    }
+
+    size_t count = cs_disasm(handle, CODE , sizeof(CODE)-1, address, &insn);
+    if (count > 0) {
+        size_t j;
+        for (j = 0; j < count; j++) {
+            disassembledInstructions[j] = insn[j];
+        }
+        cs_free(insn, count);
+    } else {
+        std::cerr << "Could not disassemble\n";
+        return -1; 
     }
 }
