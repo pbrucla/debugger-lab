@@ -5,6 +5,8 @@
 
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
+#include <string>
 
 class Breakpoint {
    public:
@@ -48,4 +50,12 @@ class Tracee {
     void write_memory(size_t addr, const void* data, size_t sz);
     // Inserts a breakpoint at address `addr` in the child process.
     void insert_breakpoint(size_t addr);
+};
+
+class Operation {
+    std::vector<std::string> get_tokenize_command();
+    int execute_command(std::vector<std::string> arguments, Tracee& tracee);
+
+    public:
+    int parse_and_run(Tracee tracee);
 };

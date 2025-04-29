@@ -14,6 +14,11 @@
 #include <unordered_map>
 #include <unordered_set>
 
+#include <readline/readline.h> // if you have issues, consider installing readline-dev or readline-devel
+#include <readline/history.h>
+#include <vector>
+#include <string>
+
 #include "util.hpp"
 
 using word = unsigned long;
@@ -195,4 +200,63 @@ int Tracee::wait_process_exit() {
             return WTERMSIG(status);
         }
     }
+}
+
+
+
+
+std::vector<std::string> Operation::get_tokenize_command()
+{
+    std::vector<std::string> command_arguments;
+    std::string command = readline(NULL);
+    int command_len = command.size();
+    int begin_substring = 0;
+    int substring_len = 0;
+    
+    for (int i = 0; i < command_len; i++) // tokenize into command_arguments
+    {
+        char ch = command.at(i);
+        if (ch == ' ')
+        {
+            std::string arg = command.substr(begin_substring, substring_len);
+            command_arguments.push_back(arg);
+            begin_substring = i + 1;
+        }
+        else
+        {
+            substring_len++;
+        }   
+    }
+    command_arguments.push_back(command.substr(begin_substring)); // push the last arg
+
+    return command_arguments;
+}
+
+int Operation::execute_command(std::vector<std::string> arguments, Tracee& tracee)
+{
+    std::string command = arguments.at(0);
+    
+    // yandere dev energy
+    if (command == "brk" || command == "break" || command == "breakpoint")
+    {
+        unsigned long arg1 = std::stoul(arguments.at(1));
+        tracee.insert_breakpoint(arg1);
+        return 0;
+    }
+
+    else if (command == "clr" || command == "clear")
+    {
+
+    }
+    else if (command == "r" || command == "run")
+    {
+
+    }
+
+
+}
+
+int Operation::parse_and_run(Tracee tracee)
+{
+    return execute_command(get_tokenize_command(), tracee);
 }

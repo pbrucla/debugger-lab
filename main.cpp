@@ -4,7 +4,7 @@
 #include <iostream>
 #include <vector>
 #include "dbg.hpp"
-#include <readline/readline.h> // if you have issues, consider installing readline-dev or readline-devel
+
 
 unsigned long long int x = 0x1337133713371337ULL;
 
@@ -25,16 +25,10 @@ int main(int argc, char* argv[], char* envp[]) {
 
     try {
         proc.spawn_process(progname, args.data(), envp);
-        //    unsigned long long x;
-        // proc.read_memory(0x407008, &x, sizeof(x));
-        //     std::cout << "Read a value of: " << std::hex << x << std::dec << '\n';
-        proc.insert_breakpoint(0x4011c0);
-        proc.continue_process();
-        std::cout << "Hit breakpoint. Press ENTER to continue." << std::endl;
-        std::cin.get();
-        proc.continue_process();
-        std::cout << "Hit breakpoint. Press ENTER to continue." << std::endl;
-        std::cin.get();
+        unsigned long long x;
+        proc.read_memory(0x407008, &x, sizeof(x));
+        std::cout << "Read a value of: " << std::hex << x << std::dec << '\n';
+        proc.insert_breakpoint(0x40106f);
         proc.continue_process();
         std::cout << "Hit breakpoint. Press ENTER to continue." << std::endl;
         std::cin.get();
