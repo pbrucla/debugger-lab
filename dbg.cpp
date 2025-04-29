@@ -203,8 +203,6 @@ int Tracee::wait_process_exit() {
 }
 
 
-
-
 std::vector<std::string> Operation::get_tokenize_command()
 {
     std::vector<std::string> command_arguments;
@@ -237,23 +235,34 @@ int Operation::execute_command(std::vector<std::string> arguments, Tracee& trace
     std::string command = arguments.at(0);
     
     // yandere dev energy
-    if (command == "brk" || command == "break" || command == "breakpoint")
+    while (true)
     {
-        unsigned long arg1 = std::stoul(arguments.at(1));
-        tracee.insert_breakpoint(arg1);
-        return 0;
+        if (command == "b" || command == "brk" || command == "break" || command == "breakpoint")
+        {
+            unsigned long arg1 = std::stoul(arguments.at(1));
+            tracee.insert_breakpoint(arg1);
+            std::cout << "Breakpoint added\n";
+        }
+        else if (command == "clr" || command == "clear")
+        {
+            unsigned long arg1 = std::stoul(arguments.at(1));
+            // TODO wait for public breakpoint removal method
+            std::cout << "Breakpoint removed\n";
+        }
+        else if (command == "c" || command == "continue")
+        {
+            return tracee.continue_process();
+        }
+        else if (command == "si" || command == "stepin")
+        {
+            tracee.step_into();
+        }
+        else
+        {
+            // TODO put a helpful message here
+        }
     }
-
-    else if (command == "clr" || command == "clear")
-    {
-
-    }
-    else if (command == "r" || command == "run")
-    {
-
-    }
-
-
+    
 }
 
 int Operation::parse_and_run(Tracee tracee)
