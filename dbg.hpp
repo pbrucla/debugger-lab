@@ -83,5 +83,3 @@ class Tracee {
 
     void write_register(Register reg, int size, uint64_t value);
 };
-
-Register string_to_register(const std::string& name);
