@@ -48,6 +48,7 @@ class Breakpoint {
 
 class Tracee {
     static constexpr int NOCHILD = -1;
+    bool breakpoint_hit = false;
 
     pid_t child_pid = NOCHILD;
     std::unordered_map<size_t, Breakpoint> breakpoints;
