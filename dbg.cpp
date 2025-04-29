@@ -176,7 +176,7 @@ int Tracee::wait_process_exit() {
     }
 }
 
-uint64_t& get_register_ref(user_regs_struct& regs, Register reg) {
+unsigned long long& get_register_ref(user_regs_struct& regs, Register reg) {
     switch (reg) {
         case R15:
             return regs.r15;
@@ -194,9 +194,9 @@ uint64_t& get_register_ref(user_regs_struct& regs, Register reg) {
             return regs.r11;
         case R10:
             return regs.r10;
-        case R9: 
+        case R9:
             return regs.r9;
-        case R8: 
+        case R8:
             return regs.r8;
         case RAX:
             return regs.rax;
@@ -212,27 +212,27 @@ uint64_t& get_register_ref(user_regs_struct& regs, Register reg) {
             return regs.orig_rax;
         case RIP:
             return regs.rip;
-        case CS: 
+        case CS:
             return regs.cs;
         case EFLAGS:
             return regs.eflags;
         case RSP:
             return regs.rsp;
-        case SS: 
-            return regs.ss;       
+        case SS:
+            return regs.ss;
         case FS_BASE:
             return regs.fs_base;
         case GS_BASE:
             return regs.gs_base;
         case DS:
             return regs.ds;
-        case ES: 
+        case ES:
             return regs.es;
-        case FS: 
+        case FS:
             return regs.fs;
-        case GS: 
+        case GS:
             return regs.gs;
-        default: 
+        default:
             throw std::runtime_error("Failed to get register ref");
     }
 }
@@ -243,16 +243,16 @@ uint64_t Tracee::read_register(Register reg, int size) {
         perror("ptrace(PTRACE_GETREGS)");
         throw std::runtime_error("Failed to get registers");
     }
-    uint64_t& value = get_register_ref(regs, reg);
-    
-    switch (size) { // size is in bytes
-        case 1: // 1 byte
+    unsigned long long& value = get_register_ref(regs, reg);
+
+    switch (size) {  // size is in bytes
+        case 1:      // 1 byte
             return value & 0xFF;
-        case 2: // 2 bytes
+        case 2:  // 2 bytes
             return value & 0xFFFF;
-        case 4: // 4 bytes
+        case 4:  // 4 bytes
             return value & 0xFFFFFFFF;
-        case 8: // 8 bytes (full register)
+        case 8:  // 8 bytes (full register)
             return value;
         default:
             throw std::runtime_error("Unsupported register size");
@@ -265,30 +265,64 @@ void Tracee::write_register(Register reg, int size, uint64_t value) {
         perror("ptrace(PTRACE_GETREGS)");
         throw std::runtime_error("Failed to get registers");
     }
-    
-    uint64_t& full_register = get_register_ref(regs, reg);
 
-     switch (size) { // size is in bytes
-        case 1: // 1 byte
+    unsigned long long& full_register = get_register_ref(regs, reg);
+
+    switch (size) {  // size is in bytes
+        case 1:      // 1 byte
             full_register = (full_register & ~0xFF) | (value & 0xFF);
             break;
-        case 2: // 2 bytes
+        case 2:  // 2 bytes
             full_register = (full_register & ~0xFFFF) | (value & 0xFFFF);
             break;
-        case 4: // 4 bytes
+        case 4:  // 4 bytes
             full_register = (full_register & ~0xFFFFFFFF) | (value & 0xFFFFFFFF);
             break;
-        case 8: // 8 bytes (full register)
+        case 8:  // 8 bytes (full register)
             full_register = value;
             break;
         default:
             throw std::runtime_error("Unsupported register size");
     }
-    
+
     if (ptrace(PTRACE_SETREGS, child_pid, nullptr, &regs) == -1) {
         perror("ptrace(PTRACE_SETREGS)");
         throw std::runtime_error("Failed to set registers");
     }
 }
 
+const std::unordered_map<std::string, Register> reg_map = {{"r15", R15},
+                                                           {"r14", R14},
+                                                           {"r13", R13},
+                                                           {"r12", R12},
+                                                           {"rbp", RBP},
+                                                           {"rbx", RBX},
+                                                           {"r11", R11},
+                                                           {"r10", R10},
+                                                           {"r9", R9},
+                                                           {"r8", R8},
+                                                           {"rax", RAX},
+                                                           {"rcx", RCX},
+                                                           {"rdx", RDX},
+                                                           {"rsi", RSI},
+                                                           {"rdi", RDI},
+                                                           {"orig_rax", ORIG_RAX},
+                                                           {"rip", RIP},
+                                                           {"cs", CS},
+                                                           {"eflags", EFLAGS},
+                                                           {"rsp", RSP},
+                                                           {"ss", SS},
+                                                           {"fs_base", FS_BASE},
+                                                           {"gs_base", GS_BASE},
+                                                           {"ds", DS},
+                                                           {"es", ES},
+                                                           {"fs", FS},
+                                                           {"gs", GS}};
 
+Register string_to_register(const std::string& name) {
+    auto it = reg_map.find(name);
+    if (it == reg_map.end()) {
+        throw std::invalid_argument("Unknown register name: " + name);
+    }
+    return it->second;
+}

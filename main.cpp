@@ -28,10 +28,12 @@ int main(int argc, char* argv[], char* envp[]) {
         unsigned long long x;
         proc.read_memory(0x407008, &x, sizeof(x));
         std::cout << "Read a value of: " << std::hex << x << std::dec << '\n';
-        proc.insert_breakpoint(0x40106f);
+        proc.insert_breakpoint(0x40108a);
         proc.continue_process();
         std::cout << "Hit breakpoint. Press ENTER to continue." << std::endl;
         std::cin.get();
+        std::cout << "Read " << std::hex << proc.read_register(Register::RSI, 8) << std::dec << '\n';
+        proc.write_register(Register::RSI, 2, 0x1234ULL);
         proc.continue_process();
         int exit = proc.wait_process_exit();
         std::cout << "Got exit code " << exit << ".\n";
