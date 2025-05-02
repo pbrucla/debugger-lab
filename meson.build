@@ -6,4 +6,4 @@ project('cydbg', 'cpp',
 subproject('LIEF')
 lief_dep = dependency('LIEF_dep')
 
-exe = executable('cydbg', 'main.cpp', 'util.cpp', 'dbg.cpp', dependencies: [lief_dep])
+exe = executable('cydbg', 'main.cpp', 'util.cpp', 'dbg.cpp', 'elf.cpp', dependencies: [lief_dep])
