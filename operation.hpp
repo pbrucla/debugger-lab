@@ -11,15 +11,17 @@
 #include "dbg.hpp"
 
 class Operation {
-    ELF* elf;
-    Tracee* tracee = NULL;
-    long get_addr(std::string arg);
-    std::vector<std::string> get_tokenize_command();
-    int execute_command(std::vector<std::string> arguments);
-
     public:
         Operation(Tracee& tracee_arg, ELF& elf_arg);
         Operation(Tracee& tracee_arg);
         int parse_and_run();
+
+    private:
+        ELF* elf;
+        Tracee* tracee = NULL;
+        long get_addr(std::string arg);
+        std::vector<std::string> get_tokenize_command();
+        int execute_command(std::vector<std::string> arguments);
 };
+
 #endif
