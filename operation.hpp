@@ -6,7 +6,7 @@
 #include <vector>
 #include <iostream>
 
-// #include "elf.hpp"
+#include "elf.hpp"
 #include "dbg.hpp"
 
 class Operation {
