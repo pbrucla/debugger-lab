@@ -61,5 +61,5 @@ class Tracee {
     
     MUST PASS 6 UNSIGNED LONGS - FILL EXTRA REGISTERS WITH JUNK VALUES IF NECESSARY
     */
-    void syscall(const int syscall, const std::array<unsigned long,6>& args);
+    unsigned long syscall(const unsigned long syscall, const std::array<unsigned long,6>& args);
 };

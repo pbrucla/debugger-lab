@@ -198,19 +198,19 @@ int Tracee::wait_process_exit() {
     }
 }
 
-void Tracee::syscall(const int syscall, const std::array<unsigned long,6>& args){
+unsigned long Tracee::syscall(const unsigned long syscall, const std::array<unsigned long,6>& args){
     // read registers
     struct user_regs_struct regs;
     ptrace(PTRACE_GETREGS, child_pid, nullptr, &regs);
-    //inject syscall
-    unsigned long instruction_ptr_addr = regs.rip;
+
+    //inject syscall & store prev instr at addr
+    unsigned long instruction_ptr_addr = regs.rip & ~0xfff; // idk why im page aligning tbh
+    int syscall_code = 0x050f;
     
     int instruction = 0; // old value at memory
-    read_memory(instruction_ptr_addr, &instruction, 2);
-    int syscall_code = 0x0f05;
+    read_memory(instruction_ptr_addr, &instruction, 2); 
     write_memory(instruction_ptr_addr, &syscall_code, 2); // overwrite to be syscall
 
-    // set regs appropriately
     // set regs (INTERFACE UNAVAILABLE)
     struct user_regs_struct syscall_regs = regs;
     syscall_regs.rax = syscall;
@@ -220,13 +220,20 @@ void Tracee::syscall(const int syscall, const std::array<unsigned long,6>& args)
     syscall_regs.r10 = args[3];
     syscall_regs.r8 = args[4];
     syscall_regs.r9 = args[5];
-    ptrace(PTRACE_SETREGS, child_pid, nullptr, &syscall_regs);
+    syscall_regs.rip = instruction_ptr_addr;
+    util::throw_errno(ptrace(PTRACE_SETREGS, child_pid, nullptr, &syscall_regs));
 
     step_into(); // actually run the syscall
-    std::cout << "ewueirhg\n";
-    std::cout << instruction << std::endl;
+
+    // retrieve return value
+    struct user_regs_struct after;
+    ptrace(PTRACE_GETREGS, child_pid, nullptr, &after);
+    unsigned long rv = after.rax; // retvals at %rax
 
     write_memory(instruction_ptr_addr, &instruction, 2); // restore instruction
-    std::cout << "Dfiglerghlk\n";
-    ptrace(PTRACE_SETREGS, child_pid, nullptr, &regs);
+    
+    //set regs back
+    util::throw_errno(ptrace(PTRACE_SETREGS, child_pid, nullptr, &regs));
+    
+    return rv;
 }
