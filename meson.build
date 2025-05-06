@@ -3,5 +3,6 @@ project('cydbg', 'cpp',
   default_options : ['warning_level=3',
                      'cpp_std=c++20'])
 
-exe = executable('cydbg', 'main.cpp', 'util.cpp', 'dbg.cpp')
+capstone_dep = dependency('capstone', required: true)
+exe = executable('cydbg', 'main.cpp', 'util.cpp', 'dbg.cpp', dependencies: [capstone_dep])
 

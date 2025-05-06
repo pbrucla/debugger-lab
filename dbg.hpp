@@ -5,6 +5,8 @@
 
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
+#include <capstone/capstone.h>
 
 class Breakpoint {
    public:
@@ -48,4 +50,8 @@ class Tracee {
     void write_memory(size_t addr, const void* data, size_t sz);
     // Inserts a breakpoint at address `addr` in the child process.
     void insert_breakpoint(size_t addr);
+    // Creates an array of instruction structs at a certain 
+    int disassemble(int lineNumber, size_t address, std::vector<cs_insn*> disassembledInstructions);
+    // Prints out disassembled instructions
+    int print_disassemble(std::vector<cs_insn*> disassembledInstructions);
 };
