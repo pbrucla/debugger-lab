@@ -313,7 +313,10 @@ void Tracee::write_register(Register reg, int size, uint64_t value) {
 }
 
 std::pair<uint64_t, uint64_t> get_stackframe(uint64_t bp) {
-    
-    read_memory(bp, )
+    unit64_t next_bp = 0;
+    unit64_t return_address = 0;
+    read_memory(bp, &next_bp, 8);
+    read_memory(bp + 8, &return_address, 8);
 
+    return{return_address, next_bp};
 }
