@@ -1,6 +1,6 @@
+#include <cstdio>
 #include <readline/readline.h> // if you have issues, consider installing readline-dev or readline-devel
 #include <readline/history.h>
-#include <cstdio>
 #include <string>
 #include <vector>
 #include <iostream>
