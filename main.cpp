@@ -17,7 +17,9 @@ int main(int argc, char* argv[], char* envp[]) {
     }
 
     char* const progname = argv[1];
-    parse_elf(progname);
+    ELF elf(progname);
+    auto main_sym = elf.lookup_sym("main");
+    printf("main: %#lx\n", main_sym.value());
     std::vector<char*> args;
     args.push_back(progname);
     args.insert(args.end(), argv + 2, argv + argc);
