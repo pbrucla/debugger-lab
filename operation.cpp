@@ -109,8 +109,8 @@ int Operation::execute_command(std::vector<std::string> arguments)
                             "clr/clear *HEXADDR\n" <<
                             "clr/clear SYMBOL\n" <<
                             "c/continue\n" <<
-                            "si\n" << 
-                            "bt\n"
+                            "si/stepin\n" << 
+                            "bt/backtrace\n"
                             ;
         }
     }
