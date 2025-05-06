@@ -41,7 +41,6 @@ int main(int argc, char* argv[], char* envp[]) {
         std::cout << "Going to try to syscall" << std::endl;
         std::string str = "Hi my name is Ebony Dark’ness Dementia Raven Way and I have long ebony black hair (that’s how I got my name) with purple streaks and red tips that reaches my mid-back and icy blue eyes like limpid tears and a lot of people tell me I look like Amy Lee (AN: if u don’t know who she is get da hell out of here!).\n";
         unsigned long len = str.size();
-        std::cout << len << std::endl;
         const char* cstr = str.c_str();
         //mmap(null, 0x1000,3,0, -1,0)
         unsigned long f = proc.syscall(0x09, {0,0x1000,3,0x22,(unsigned long)0,0});
