@@ -5,16 +5,20 @@
 #include <string>
 #include <vector>
 #include <iostream>
+#include <optional>
 
 #include "elf.hpp"
 #include "dbg.hpp"
 
 class Operation {
-    unsigned long get_addr(std::string arg);
+    ELF* elf;
+    Tracee* tracee;
+    long get_addr(std::string arg);
     std::vector<std::string> get_tokenize_command();
-    int execute_command(std::vector<std::string> arguments, Tracee& tracee);
+    int execute_command(std::vector<std::string> arguments);
 
     public:
-    int parse_and_run(Tracee tracee);
+        Operation(Tracee& tracee, ELF& elf);
+        int parse_and_run();
 };
 #endif

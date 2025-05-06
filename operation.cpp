@@ -1,31 +1,37 @@
 #include <readline/readline.h> // if you have issues, consider installing readline-dev or readline-devel
 #include <readline/history.h>
+#include <cstdio>
 #include <string>
 #include <vector>
 #include <iostream>
+#include <optional>
+#include "operation.hpp"
 
 #include "elf.hpp"
 #include "dbg.hpp"
 
-unsigned long Operation::get_addr(std::string arg)
+Operation::Operation(Tracee& tracee_arg, ELF& elf_arg)
 {
-    unsigned long arg1_ul = -1;
+    tracee = &tracee_arg;
+    elf = &elf_arg;
+}
+
+long Operation::get_addr(std::string arg)
+{
     if (arg[0] == '*') // address
     {
-        arg1_ul = std::stoul(arg1.substr(1), NULL, 16); // drop the asterisk, convert to usigned long
+        return std::stoul(arg.substr(1), NULL, 16); // drop the asterisk, convert to unsigned long
     }
     else // symbol
     {
-        arg1_ul = ELF::lookup_sym(arg1);
-        if (!arg1_ul)
+        std::optional<long> arg_ul = elf->lookup_sym(arg);
+        if (arg_ul.has_value())
         {
-            return -1;
+            return arg_ul.value();
         }
+        else return -1;
     }
-
-    return arg1_ul;
 }
-
 
 std::vector<std::string> Operation::get_tokenize_command()
 {
@@ -54,7 +60,7 @@ std::vector<std::string> Operation::get_tokenize_command()
     return command_arguments;
 }
 
-int Operation::execute_command(std::vector<std::string> arguments, Tracee& tracee)
+int Operation::execute_command(std::vector<std::string> arguments)
 {
     std::string command = arguments.at(0);
     
@@ -65,35 +71,35 @@ int Operation::execute_command(std::vector<std::string> arguments, Tracee& trace
         {
             // determine if we are working with an address or symbol
             std::string arg1 = arguments.at(1);
-            unsigned long arg1_ul = Operation::get_addr(arg1);
+            long arg1_l = Operation::get_addr(arg1);
             
-            if (arg1_ul == -1)
+            if (arg1_l == -1)
             {
                 std::cout << "This appears to be an invalid symbol. Try again.\n";
                 continue;
             }
 
-            tracee.insert_breakpoint(arg1_ul); // set breakpoint
-            std::cout << "Breakpoint added at" << arg1_ul << "\n";
+            tracee->insert_breakpoint(arg1_l); // set breakpoint
+            std::cout << "Breakpoint added at" << arg1_l << "\n";
         }
         else if (command == "clr" || command == "clear")
         {
-            unsigned long arg1 = std::stoul(arguments.at(1));
+            // TODO
             std::cout << "Breakpoint removed\n";
         }
         else if (command == "c" || command == "continue")
         {
             std::cout << "Continuing\n";
-            return tracee.continue_process();
+            return tracee->continue_process();
         }
         else if (command == "si" || command == "stepin")
         {
             std::cout << "Stepping into child\n";
-            tracee.step_into();
+            tracee->step_into();
         }
         else if (command == "bt" || command == "backtrace")
         {
-
+            // TODO
         }
         else
         {
@@ -111,7 +117,7 @@ int Operation::execute_command(std::vector<std::string> arguments, Tracee& trace
     
 }
 
-int Operation::parse_and_run(Tracee tracee)
+int Operation::parse_and_run()
 {
-    return execute_command(get_tokenize_command(), tracee);
+    return execute_command(get_tokenize_command());
 }
