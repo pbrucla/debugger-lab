@@ -19,6 +19,7 @@ Operation::Operation(Tracee& tracee_arg, ELF& elf_arg)
 Operation::Operation(Tracee& tracee_arg)
 {
     tracee = &tracee_arg;
+    std::cout << "No ELF parsing will occur in this session. Refrain from using symbols in arguments.\n";
 }
 
 long Operation::get_addr(std::string arg)
@@ -29,6 +30,11 @@ long Operation::get_addr(std::string arg)
     }
     else // symbol
     {
+        if (elf == NULL)
+        {
+            return -2;
+        }
+
         std::optional<long> arg_ul = elf->lookup_sym(arg);
         if (arg_ul.has_value())
         {
@@ -81,6 +87,11 @@ int Operation::execute_command(std::vector<std::string> arguments)
             if (arg1_l == -1)
             {
                 std::cout << "This appears to be an invalid symbol. Try again.\n";
+                continue;
+            }
+            else if (arg1_l == -2)
+            {
+                std::cout << "Symbols are not supported at this time. Use addresses for the time being.\n";
                 continue;
             }
 
