@@ -245,7 +245,7 @@ int Operation::execute_command(std::vector<std::string> arguments, Tracee& trace
             unsigned long arg1_ul;
             if (arg1[0] == '*') // address
             {
-                arg1_ul = std::stoul(arg1.substr(1)); // drop the asterisk, convert to usigned long
+                arg1_ul = std::stoul(arg1.substr(1), NULL, 16); // drop the asterisk, convert to usigned long
             }
             else // symbol
             {
@@ -267,15 +267,29 @@ int Operation::execute_command(std::vector<std::string> arguments, Tracee& trace
         }
         else if (command == "c" || command == "continue")
         {
+            std::cout << "Continuing\n";
             return tracee.continue_process();
         }
         else if (command == "si" || command == "stepin")
         {
+            std::cout << "Stepping into child\n";
             tracee.step_into();
+        }
+        else if (command == "bt" || command == "backtrace")
+        {
+
         }
         else
         {
-            // TODO put a helpful message here
+            std::cout <<    "Available commands:\n" << 
+                            "b/brk/break/breakpoint *HEXADDR\n" <<
+                            "b/brk/break/breakpint SYMBOL\n" <<
+                            "clr/clear *HEXADDR\n" <<
+                            "clr/clear SYMBOL\n" <<
+                            "c/continue\n" <<
+                            "si\n" << 
+                            "bt\n"
+                            ;
         }
     }
     
