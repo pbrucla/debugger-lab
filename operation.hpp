@@ -12,13 +12,14 @@
 
 class Operation {
     ELF* elf;
-    Tracee* tracee;
+    Tracee* tracee = NULL;
     long get_addr(std::string arg);
     std::vector<std::string> get_tokenize_command();
     int execute_command(std::vector<std::string> arguments);
 
     public:
-        Operation(Tracee& tracee, ELF& elf);
+        Operation(Tracee& tracee_arg, ELF& elf_arg);
+        Operation(Tracee& tracee_arg);
         int parse_and_run();
 };
 #endif

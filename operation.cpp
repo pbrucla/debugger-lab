@@ -16,6 +16,11 @@ Operation::Operation(Tracee& tracee_arg, ELF& elf_arg)
     elf = &elf_arg;
 }
 
+Operation::Operation(Tracee& tracee_arg)
+{
+    tracee = &tracee_arg;
+}
+
 long Operation::get_addr(std::string arg)
 {
     if (arg[0] == '*') // address
