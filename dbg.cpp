@@ -10,6 +10,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include <cstdint>
 #include <iostream>
 #include <unordered_map>
 #include <unordered_set>
@@ -239,14 +240,29 @@ int Operation::execute_command(std::vector<std::string> arguments, Tracee& trace
     {
         if (command == "b" || command == "brk" || command == "break" || command == "breakpoint")
         {
-            unsigned long arg1 = std::stoul(arguments.at(1));
-            tracee.insert_breakpoint(arg1);
-            std::cout << "Breakpoint added\n";
+            // determine if we are working with an address or symbol
+            std::string arg1 = arguments.at(1);
+            unsigned long arg1_ul;
+            if (arg1[0] == '*') // address
+            {
+                arg1_ul = std::stoul(arg1.substr(1)); // drop the asterisk, convert to usigned long
+            }
+            else // symbol
+            {
+                arg1_ul = ELF::lookup_sym(arg1);
+                if (!arg1_ul)
+                {
+                    std::cout << "This appears to be an invalid symbol. Try again.\n";
+                    continue;
+                }
+            }
+
+            tracee.insert_breakpoint(arg1_ul); // set breakpoint
+            std::cout << "Breakpoint added at" << arg1_ul << "\n";
         }
         else if (command == "clr" || command == "clear")
         {
             unsigned long arg1 = std::stoul(arguments.at(1));
-            // TODO wait for public breakpoint removal method
             std::cout << "Breakpoint removed\n";
         }
         else if (command == "c" || command == "continue")
