@@ -85,5 +85,33 @@ void ELF::parse(const char* filename) {
     collect_syms(".dynsym", ".dynstr");
     printf("%zu symbols loaded\n", m_syms.size());
 
+    parse_eh_frame();
+
     close(fd);
+}
+
+void ELF::parse_eh_frame() {
+    auto *eh_frame_hdr = find_section(".eh_frame");
+    if (!eh_frame_hdr) {
+        puts("No .eh_frame section found");
+        return;
+    }
+
+    uint8_t *eh_frame = m_file + eh_frame_hdr->sh_offset;
+    uint8_t *p = eh_frame;
+    uint32_t eh_frame_length = *p; p += 4;
+    if (eh_frame_length == 0xffffffff) {
+        puts("64 bit dwarf!");
+        return;
+    }
+    uint32_t eh_frame_id = *p;
+    p += 4;
+    if (eh_frame_id != 0) {
+        puts("not CIE?");
+        return;
+    }
+    uint8_t version = *p++;
+    printf("version: %d\n", version);
+    std::string aug(reinterpret_cast<char*>(p)); p += aug.length() + 1;
+    printf("aug: %s\n", aug.c_str());
 }
