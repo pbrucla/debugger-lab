@@ -25,20 +25,14 @@ int main(int argc, char* argv[], char* envp[]) {
 
     try {
         proc.spawn_process(progname, args.data(), envp);
-        proc.insert_breakpoint(0x4011c0);
+        proc.insert_breakpoint(0x40114c);
         proc.continue_process();
+        uint64_t bp = proc.read_register(Register::RBP, 8);
+        auto frame = proc.get_stackframe(bp);
+        
         std::cout << "Hit breakpoint. Press ENTER to continue." << std::endl;
         std::cin.get();
         proc.continue_process();
-        std::cout << "Hit breakpoint. Press ENTER to continue." << std::endl;
-        std::cin.get();
-        proc.continue_process();
-        std::cout << "Hit breakpoint. Press ENTER to continue." << std::endl;
-        std::cin.get();
-        std::cout << "Read " << std::hex << proc.read_register(Register::RSI, 8) << std::dec << '\n';
-        proc.write_register(Register::RSI, 2, 0x1234ULL);
-        proc.continue_process();
-        int exit = proc.wait_process_exit();
         std::cout << "Got exit code " << exit << ".\n";
     } catch (const std::system_error& e) {
         std::cerr << "Got error: " << e.what() << '\n';

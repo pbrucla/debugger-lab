@@ -311,3 +311,9 @@ void Tracee::write_register(Register reg, int size, uint64_t value) {
         throw std::runtime_error("Failed to set registers");
     }
 }
+
+std::pair<uint64_t, uint64_t> get_stackframe(uint64_t bp) {
+    
+    read_memory(bp, )
+
+}

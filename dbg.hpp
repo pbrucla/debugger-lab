@@ -6,6 +6,7 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <pair>
 
 enum Register {
     R15,
@@ -83,4 +84,7 @@ class Tracee {
     uint64_t read_register(Register reg, int size);
 
     void write_register(Register reg, int size, uint64_t value);
+
+    // Gets the current stack frame, returning a (return address, parent frame pointer) base.
+    std::pair<uint64_t, uint64_t> get_stackframe(uint64_t bp);
 };
