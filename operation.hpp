@@ -10,6 +10,7 @@
 #include "dbg.hpp"
 
 class Operation {
+    unsigned long get_addr(std::string arg);
     std::vector<std::string> get_tokenize_command();
     int execute_command(std::vector<std::string> arguments, Tracee& tracee);
 

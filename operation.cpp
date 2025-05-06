@@ -4,6 +4,29 @@
 #include <vector>
 #include <iostream>
 
+#include "elf.hpp"
+#include "dbg.hpp"
+
+unsigned long Operation::get_addr(std::string arg)
+{
+    unsigned long arg1_ul = -1;
+    if (arg[0] == '*') // address
+    {
+        arg1_ul = std::stoul(arg1.substr(1), NULL, 16); // drop the asterisk, convert to usigned long
+    }
+    else // symbol
+    {
+        arg1_ul = ELF::lookup_sym(arg1);
+        if (!arg1_ul)
+        {
+            return -1;
+        }
+    }
+
+    return arg1_ul;
+}
+
+
 std::vector<std::string> Operation::get_tokenize_command()
 {
     std::vector<std::string> command_arguments;
@@ -42,19 +65,12 @@ int Operation::execute_command(std::vector<std::string> arguments, Tracee& trace
         {
             // determine if we are working with an address or symbol
             std::string arg1 = arguments.at(1);
-            unsigned long arg1_ul;
-            if (arg1[0] == '*') // address
+            unsigned long arg1_ul = Operation::get_addr(arg1);
+            
+            if (arg1_ul == -1)
             {
-                arg1_ul = std::stoul(arg1.substr(1), NULL, 16); // drop the asterisk, convert to usigned long
-            }
-            else // symbol
-            {
-                arg1_ul = ELF::lookup_sym(arg1);
-                if (!arg1_ul)
-                {
-                    std::cout << "This appears to be an invalid symbol. Try again.\n";
-                    continue;
-                }
+                std::cout << "This appears to be an invalid symbol. Try again.\n";
+                continue;
             }
 
             tracee.insert_breakpoint(arg1_ul); // set breakpoint
