@@ -1,10 +1,9 @@
 #include <sys/wait.h>
 
-#include <cstdlib>
 #include <iostream>
 #include <vector>
 #include "dbg.hpp"
-
+#include "operation.hpp"
 
 unsigned long long int x = 0x1337133713371337ULL;
 
