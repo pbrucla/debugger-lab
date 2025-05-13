@@ -196,29 +196,34 @@ int Tracee::disassemble(int lineNumber, size_t address, std::vector<cs_insn*> di
     csh handle;
     cs_open(CS_ARCH_X86, CS_MODE_32, &handle);
     cs_insn *insn;
-    word* val;
-    u_int8_t *CODE = (u_int8_t *)malloc(16*lineNumber);
+    word* val; // = static_cast<word*>(malloc(1));
 
+    u_int8_t *CODE = (u_int8_t *)malloc(16*lineNumber);
+    std::cout << "hellos" << std::endl;
     size_t i;
     for (i=0; i < 16*lineNumber; i++) {
-        read_memory(reinterpret_cast<size_t>(address + i*8), &val, sizeof(val));
+        read_memory(reinterpret_cast<size_t>(address + i*8), val, sizeof(val));
         std::cout << *(static_cast<word*>(val)) << std::endl;
-        // *(CODE+i) = *val;
+        *(CODE+i) = *val;
     }
+    std::cout << "bye bye" << std::endl;
     
-    // size_t successfulCount = cs_disasm(handle, CODE , sizeof(CODE)-1, address, lineNumber, &insn);
-    // if (successfulCount > 0) {
-    //     size_t j;
-    //     for (j = 0; j < successfulCount; j++) {
-    //         disassembledInstructions[j] = &insn[j];
-    //     }
-    //     cs_free(insn, successfulCount);
-    // } else {
-    //     std::cerr << "Could not disassemble\n";
-    //     return -1; 
-    // }
+    size_t successfulCount = cs_disasm(handle, CODE , sizeof(CODE)-1, address, lineNumber, &insn);
+    std::cout << "after cs_disasm" << std::endl;
+    if (successfulCount > 0) {
+        std::cout << "huh" << std::endl;
+        size_t j;
+        for (j = 0; j < successfulCount; j++) {
+            disassembledInstructions.push_back(&insn[j]);
+        }
+        std::cout << "bruhasdf" << std::endl;
+        cs_free(insn, successfulCount);
+    } else {
+        std::cerr << "Could not disassemble\n";
+        return -1; 
+    }
 
-    // cs_close(&handle);
+    cs_close(&handle);
     return 0;
 }
 
