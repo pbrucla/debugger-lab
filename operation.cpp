@@ -82,7 +82,7 @@ Register Operation::get_register(std::string input)
         return GS_BASE;
     else
     {
-        printf("No valid register provided. Try again.\n");
+        perror("No valid register provided. Try again.\n");
     }
 }
 
@@ -127,6 +127,7 @@ std::vector<std::string> Operation::get_tokenize_command()
             std::string arg = command.substr(begin_substring, substring_len);
             command_arguments.push_back(arg);
             begin_substring = i + 1;
+            substring_len = 0;
         }
         else
         {
@@ -211,10 +212,11 @@ int Operation::execute_command(std::vector<std::string> arguments)
                             "b/brk/break/breakpoint SYMBOL\n" <<
                             "c/continue\n" <<
                             "si/stepin\n" << 
-                            "rr/readreg ___ " <<
-                            "wr/writereg ___ " <<
-                            "rm"
-                            "i/inj/inject ___"
+                            "rr/readreg REG NBYTES\n" <<
+                            "wr/writereg REG NBYTES VALUE\n" <<
+                            "i/inj/inject ___" <<
+                            "x/readmem ___" <<
+                            "set/writemem ___"
                             ;
         }
     }
