@@ -3,10 +3,40 @@
 #include <signal.h>
 #include <stdint.h>
 
+#include <string>
 #include <unordered_map>
 #include <unordered_set>
-#include <vector>
-#include <string>
+
+enum Register {
+    R15,
+    R14,
+    R13,
+    R12,
+    RBP,
+    RBX,
+    R11,
+    R10,
+    R9,
+    R8,
+    RAX,
+    RCX,
+    RDX,
+    RSI,
+    RDI,
+    ORIG_RAX,
+    RIP,
+    CS,
+    EFLAGS,
+    RSP,
+    SS,
+    FS_BASE,
+    GS_BASE,
+    DS,
+    ES,
+    FS,
+    GS,
+};
+#include <array>
 
 class Breakpoint {
    public:
@@ -50,4 +80,20 @@ class Tracee {
     void write_memory(size_t addr, const void* data, size_t sz);
     // Inserts a breakpoint at address `addr` in the child process.
     void insert_breakpoint(size_t addr);
+
+    uint64_t read_register(Register reg, int size);
+
+    void write_register(Register reg, int size, uint64_t value);
+
+    /* Syscall insertion (clobber rcx, r11)
+    args[0] = %rdi
+    args[1] = %rsi
+    args[2] = %rdx
+    args[3] = %r10
+    args[4] = %r8
+    args[5] = %r9
+
+    MUST PASS 6 UNSIGNED LONGS - FILL EXTRA REGISTERS WITH JUNK VALUES IF NECESSARY
+    */
+    unsigned long syscall(const unsigned long syscall, const std::array<unsigned long, 6>& args);
 };

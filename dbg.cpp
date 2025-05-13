@@ -10,13 +10,10 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#include <cstdint>
+#include <array>
 #include <iostream>
 #include <unordered_map>
 #include <unordered_set>
-
-#include <vector>
-#include <string>
 
 #include "util.hpp"
 
@@ -198,5 +195,159 @@ int Tracee::wait_process_exit() {
             child_pid = NOCHILD;
             return WTERMSIG(status);
         }
+    }
+}
+
+unsigned long Tracee::syscall(const unsigned long syscall, const std::array<unsigned long, 6>& args) {
+    // read registers
+    struct user_regs_struct regs;
+    ptrace(PTRACE_GETREGS, child_pid, nullptr, &regs);
+
+    // inject syscall & store prev instr at addr
+    unsigned long instruction_ptr_addr = regs.rip & ~0xfff;  // idk why im page aligning tbh
+    int syscall_code = 0x050f;
+
+    int instruction = 0;  // old value at memory
+    read_memory(instruction_ptr_addr, &instruction, 2);
+    write_memory(instruction_ptr_addr, &syscall_code, 2);  // overwrite to be syscall
+
+    // set regs (INTERFACE UNAVAILABLE)
+    struct user_regs_struct syscall_regs = regs;
+    syscall_regs.rax = syscall;
+    syscall_regs.rdi = args[0];
+    syscall_regs.rsi = args[1];
+    syscall_regs.rdx = args[2];
+    syscall_regs.r10 = args[3];
+    syscall_regs.r8 = args[4];
+    syscall_regs.r9 = args[5];
+    syscall_regs.rip = instruction_ptr_addr;
+    util::throw_errno(ptrace(PTRACE_SETREGS, child_pid, nullptr, &syscall_regs));
+
+    step_into();  // actually run the syscall
+
+    // retrieve return value
+    struct user_regs_struct after;
+    ptrace(PTRACE_GETREGS, child_pid, nullptr, &after);
+    unsigned long rv = after.rax;  // retvals at %rax
+
+    write_memory(instruction_ptr_addr, &instruction, 2);  // restore instruction
+
+    // set regs back
+    util::throw_errno(ptrace(PTRACE_SETREGS, child_pid, nullptr, &regs));
+
+    return rv;
+}
+unsigned long long& get_register_ref(user_regs_struct& regs, Register reg) {
+    switch (reg) {
+        case R15:
+            return regs.r15;
+        case R14:
+            return regs.r14;
+        case R13:
+            return regs.r13;
+        case R12:
+            return regs.r12;
+        case RBP:
+            return regs.rbp;
+        case RBX:
+            return regs.rbx;
+        case R11:
+            return regs.r11;
+        case R10:
+            return regs.r10;
+        case R9:
+            return regs.r9;
+        case R8:
+            return regs.r8;
+        case RAX:
+            return regs.rax;
+        case RCX:
+            return regs.rcx;
+        case RDX:
+            return regs.rdx;
+        case RSI:
+            return regs.rsi;
+        case RDI:
+            return regs.rdi;
+        case ORIG_RAX:
+            return regs.orig_rax;
+        case RIP:
+            return regs.rip;
+        case CS:
+            return regs.cs;
+        case EFLAGS:
+            return regs.eflags;
+        case RSP:
+            return regs.rsp;
+        case SS:
+            return regs.ss;
+        case FS_BASE:
+            return regs.fs_base;
+        case GS_BASE:
+            return regs.gs_base;
+        case DS:
+            return regs.ds;
+        case ES:
+            return regs.es;
+        case FS:
+            return regs.fs;
+        case GS:
+            return regs.gs;
+        default:
+            throw std::runtime_error("Failed to get register ref");
+    }
+}
+
+uint64_t Tracee::read_register(Register reg, int size) {
+    struct user_regs_struct regs;
+    if (ptrace(PTRACE_GETREGS, child_pid, nullptr, &regs) == -1) {
+        perror("ptrace(PTRACE_GETREGS)");
+        throw std::runtime_error("Failed to get registers");
+    }
+    unsigned long long& value = get_register_ref(regs, reg);
+
+    switch (size) {  // size is in bytes
+        case 1:      // 1 byte
+            return value & 0xFF;
+        case 2:  // 2 bytes
+            return value & 0xFFFF;
+        case 4:  // 4 bytes
+            return value & 0xFFFFFFFF;
+        case 8:  // 8 bytes (full register)
+            return value;
+        default:
+            throw std::runtime_error("Unsupported register size");
+    }
+}
+
+void Tracee::write_register(Register reg, int size, uint64_t value) {
+    struct user_regs_struct regs;
+    if (ptrace(PTRACE_GETREGS, child_pid, nullptr, &regs) == -1) {
+        perror("ptrace(PTRACE_GETREGS)");
+        throw std::runtime_error("Failed to get registers");
+    }
+
+    unsigned long long& full_register = get_register_ref(regs, reg);
+
+    switch (size) {  // size is in bytes
+        case 1:      // 1 byte
+            full_register = (full_register & ~0xFF) | (value & 0xFF);
+            break;
+        case 2:  // 2 bytes
+            full_register = (full_register & ~0xFFFF) | (value & 0xFFFF);
+            break;
+        case 4:  // 4 bytes
+            full_register = (full_register & ~0xFFFFFFFF) | (value & 0xFFFFFFFF);
+            break;
+        case 8:  // 8 bytes (full register)
+            full_register = value;
+            break;
+        default:
+            throw std::runtime_error("Unsupported register size");
+    }
+
+    if (ptrace(PTRACE_SETREGS, child_pid, nullptr, &regs) == -1) {
+        perror("ptrace(PTRACE_SETREGS)");
+        throw std::runtime_error("Failed to set registers");
     }
 }
