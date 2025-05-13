@@ -5,6 +5,7 @@
 #include <signal.h>
 #include <stdint.h>
 #include <string.h>
+#include <sys/personality.h>
 #include <sys/ptrace.h>
 #include <sys/user.h>
 #include <sys/wait.h>
@@ -14,9 +15,12 @@
 #include <unordered_map>
 #include <unordered_set>
 
+
 #include "util.hpp"
 
 using word = unsigned long;
+
+
 
 Breakpoint::Breakpoint(size_t addr) : addr(addr), injected(false), orig_byte(0) {}
 
@@ -115,6 +119,8 @@ void Tracee::spawn_process(const char* pathname, char* const argv[], char* const
     pid_t pid = util::throw_errno(fork());
     if (pid == 0) {
         // child
+        int persona = personality(0xffffffffULL);
+        personality(persona | ADDR_NO_RANDOMIZE);
         util::throw_errno(ptrace(PTRACE_TRACEME, 0, nullptr, nullptr));
         util::throw_errno(execve(pathname, argv, envp));
     } else {
@@ -312,11 +318,28 @@ void Tracee::write_register(Register reg, int size, uint64_t value) {
     }
 }
 
-std::pair<uint64_t, uint64_t> get_stackframe(uint64_t bp) {
+std::pair<uint64_t, uint64_t> Tracee::get_stackframe(uint64_t bp) { //will only go up one layer
     uint64_t next_bp = 0;
     uint64_t return_address = 0;
     read_memory(bp, &next_bp, 8);
     read_memory(bp + 8, &return_address, 8);
 
     return{return_address, next_bp};
+}
+
+void Tracee::bactrace() { 
+    uint64_t bp = proc.read_register(Register::RBP, 8);
+    uint64_t next_bp = 0;
+    uint64_t return_address = 0;
+
+    int valid = 1;
+    while(valid){
+        return_address, next_bp = get_stackframe(bp);
+        unsigned long long addr = ptrace(PTRACE_PEEKDATA, child_pid, return_address, nullptr);
+        if(addr == -1){
+            valid = 0;
+        } else {
+            std::cout<< addr << std::endl;
+        }
+    }
 }

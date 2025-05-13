@@ -3,8 +3,10 @@
 #include <cstdlib>
 #include <iostream>
 #include <vector>
+#include <cassert>
 
 #include "dbg.hpp"
+std::unordered_map<uint64_t, uint64_t> fake_memory;
 
 unsigned long long int x = 0x1337133713371337ULL;
 
@@ -28,7 +30,11 @@ int main(int argc, char* argv[], char* envp[]) {
         proc.insert_breakpoint(0x40114c);
         proc.continue_process();
         uint64_t bp = proc.read_register(Register::RBP, 8);
-        auto frame = proc.get_stackframe(bp);
+        auto [addresstest, bptest] = proc.get_stackframe(bp);
+        std::cout<<std::hex;
+        std::cout << "bp " << bp << ".\n";
+        std::cout << "addresstest " << addresstest << ".\n";
+        std::cout << "bptest " << bptest << ".\n";
         
         std::cout << "Hit breakpoint. Press ENTER to continue." << std::endl;
         std::cin.get();
@@ -38,5 +44,7 @@ int main(int argc, char* argv[], char* envp[]) {
         std::cerr << "Got error: " << e.what() << '\n';
         return 1;
     }
+
+
     return 0;
 }

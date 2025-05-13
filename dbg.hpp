@@ -6,7 +6,7 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
-#include <pair>
+#include <utility>
 
 enum Register {
     R15,
@@ -87,4 +87,6 @@ class Tracee {
 
     // Gets the current stack frame, returning a (return address, parent frame pointer) base.
     std::pair<uint64_t, uint64_t> get_stackframe(uint64_t bp);
+
+    void Tracee::bactrace(); 
 };

@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <unistd.h>
+#include <cassert>
 
 unsigned long long int x = 0x1234567812345678ULL;
 
@@ -20,7 +21,9 @@ void f() {
     puts("f finished");
 }
 
+
 int main(void) {
+ 
     f();
     puts("done");
     return 0;
