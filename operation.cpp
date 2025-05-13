@@ -81,8 +81,9 @@ Register Operation::get_register(std::string input)
     else if (input == "gs_base" || input == "GS_BASE")
         return GS_BASE;
     else
+    {
         printf("No valid register provided. Try again.\n");
-        return NULL; // this might not work
+    }
 }
 
 /* TODO uncomment upon ELF merging into main 
@@ -179,13 +180,17 @@ int Operation::execute_command(std::vector<std::string> arguments)
         }
         else if (command == "rr" || command == "readreg")
         {
-            // TODO
-            tracee->read_register(,);
+            Register arg1 = get_register(arguments.at(1));
+            int arg2 = std::stoi(arguments.at(2));
+            printf("%lu", tracee->read_register(arg1, arg2));
         }
         else if (command == "wr" || command == "writereg")
         {
-            // TODO
-            tracee->write_register(,,);
+            Register arg1 = get_register(arguments.at(1));
+            int arg2 = stoi(arguments.at(2));
+            unsigned long arg3 = std::stoul(arguments.at(3));
+            tracee->write_register(arg1, arg2, arg3);
+            printf("Written\n");
         }
         else if (command == "i" || command == "inj" || command == "inject")
         {
