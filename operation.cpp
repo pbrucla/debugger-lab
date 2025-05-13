@@ -124,6 +124,18 @@ int Operation::execute_command(std::vector<std::string> arguments)
         {
             // TODO
         }
+        else if (command == "rr" || command == "readreg")
+        {
+            // TODO
+        }
+        else if (command == "wr" || command == "writereg")
+        {
+            // TODO
+        }
+        else if (command == "i" || command == "inj" || command == "inject")
+        {
+            // TODO
+        }
         else
         {
             std::cout <<    "Available commands:\n" << 
