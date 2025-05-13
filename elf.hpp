@@ -17,7 +17,6 @@ class ELF {
    private:
     Elf64_Shdr* find_section(const char* name) const;
     void parse(const char* filename);
-    void parse_eh_frame();
 
     uint64_t m_base = 0;
     uint8_t* m_file;
@@ -26,19 +25,4 @@ class ELF {
     Elf64_Shdr* m_shdrs;
     const char* m_shstrtab;
     std::unordered_map<std::string_view, uint64_t> m_syms;
-};
-
-struct EhFrameHdr {
-    uint8_t version;
-    uint8_t eh_frame_ptr_enc;
-    uint8_t fde_count_enc;
-    uint8_t table_enc;
-    uint32_t eh_frame_ptr;
-    uint32_t fde_count;
-    EhFrameHdrTblEnt* bin_search_tbl;
-};
-
-struct EhFrameHdrTblEnt {
-    uint32_t loc;
-    uint32_t addr;
 };

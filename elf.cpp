@@ -13,6 +13,7 @@
 #include <string_view>
 #include <unordered_map>
 
+#include "dwarf.hpp"
 #include "util.hpp"
 
 ELF::ELF(const char* filename) { parse(filename); }
@@ -22,7 +23,7 @@ ELF::~ELF() { munmap(m_file, m_filesize); }
 std::optional<uint64_t> ELF::lookup_sym(std::string_view name) const {
     auto sym = m_syms.find(name);
     if (sym == m_syms.end()) return {};
-    return sym->second;
+    return m_base + sym->second;
 }
 
 Elf64_Shdr* ELF::find_section(const char* name) const {
@@ -75,7 +76,7 @@ void ELF::parse(const char* filename) {
         auto* strtab = reinterpret_cast<char*>(m_file + strtab_shdr->sh_offset);
         for (size_t i = 0; i < symtab_shdr->sh_size / sizeof(Elf64_Sym); ++i) {
             auto* sym = symtab + i;
-            if (ELF64_ST_TYPE(sym->st_info) == STT_FUNC && sym->st_value != 0) {
+            if (ELF64_ST_TYPE(sym->st_info) == STT_FUNC && sym->st_shndx != SHN_UNDEF) {
                 m_syms.emplace(strtab + sym->st_name, sym->st_value);
             }
         }
@@ -85,33 +86,16 @@ void ELF::parse(const char* filename) {
     collect_syms(".dynsym", ".dynstr");
     printf("%zu symbols loaded\n", m_syms.size());
 
-    parse_eh_frame();
+    auto* eh_frame_shdr = find_section(".eh_frame");
+    if (!eh_frame_shdr) {
+        puts("No .eh_frame section found");
+    } else {
+        auto* eh_frame = m_file + eh_frame_shdr->sh_offset;
+        size_t eh_frame_size = eh_frame_shdr->sh_size;
+        const auto* p = eh_frame;
+        std::unordered_map<size_t, DWARF::CIE> cie_map;
+        while (p < eh_frame + eh_frame_size) DWARF::parse_eh_frame_entry(p, eh_frame, eh_frame_shdr->sh_addr, cie_map);
+    }
 
     close(fd);
-}
-
-void ELF::parse_eh_frame() {
-    auto *eh_frame_hdr = find_section(".eh_frame");
-    if (!eh_frame_hdr) {
-        puts("No .eh_frame section found");
-        return;
-    }
-
-    uint8_t *eh_frame = m_file + eh_frame_hdr->sh_offset;
-    uint8_t *p = eh_frame;
-    uint32_t eh_frame_length = *p; p += 4;
-    if (eh_frame_length == 0xffffffff) {
-        puts("64 bit dwarf!");
-        return;
-    }
-    uint32_t eh_frame_id = *p;
-    p += 4;
-    if (eh_frame_id != 0) {
-        puts("not CIE?");
-        return;
-    }
-    uint8_t version = *p++;
-    printf("version: %d\n", version);
-    std::string aug(reinterpret_cast<char*>(p)); p += aug.length() + 1;
-    printf("aug: %s\n", aug.c_str());
 }
