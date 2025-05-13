@@ -21,6 +21,7 @@ class Operation {
         // ELF* elf;
         Tracee* tracee = NULL;
         long get_addr(std::string arg);
+        Register get_register(std::string input);
         std::vector<std::string> get_tokenize_command();
         int execute_command(std::vector<std::string> arguments);
 };

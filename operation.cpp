@@ -24,6 +24,67 @@ Operation::Operation(Tracee& tracee_arg)
     std::cout << "No ELF parsing will occur in this session. Refrain from using symbols in arguments.\n";
 }
 
+Register Operation::get_register(std::string input)
+{
+    if (input == "r15" || input == "R15")
+        return R15;
+    else if (input == "r14" || input == "R14")
+        return R14;
+    else if (input == "r13" || input == "R13")
+        return R13;
+    else if (input == "r12" || input == "R12")
+        return R12;
+    else if (input == "r11" || input == "R11")
+        return R11;
+    else if (input == "r10" || input == "R10")
+        return R10;
+    else if (input == "r9" || input == "R9")
+        return R9;
+    else if (input == "r8" || input == "R8")
+        return R8;
+    else if (input == "rbp" || input == "RBP")
+        return RBP;
+    else if (input == "rbx" || input == "RBX")
+        return RBX;
+    else if (input == "rax" || input == "RAX")
+        return RAX;
+    else if (input == "rcx" || input == "RCX")
+        return RCX;
+    else if (input == "rdx" || input == "RDX")
+        return RDX;
+    else if (input == "rsi" || input == "RSI")
+        return RSI;
+    else if (input == "rdi" || input == "RDI")
+        return RDI;
+    else if (input == "rip" || input == "RIP")
+        return RIP;
+    else if (input == "rsp" || input == "RSP")
+        return RSP;
+    else if (input == "orig_rax" || input == "ORIG_RAX")
+        return ORIG_RAX;
+    else if (input == "cs" || input == "CS")
+        return CS;
+    else if (input == "eflags" || input == "EFLAGS")
+        return EFLAGS;
+    else if (input == "ss" || input == "SS")
+        return SS;
+    else if (input == "ds" || input == "DS")
+        return DS;
+    else if (input == "es" || input == "ES")
+        return ES;
+    else if (input == "fs" || input == "FS")
+        return FS;
+    else if (input == "gs" || input == "GS")
+        return GS;
+    else if (input == "fs_base" || input == "FS_BASE")
+        return FS_BASE;
+    else if (input == "gs_base" || input == "GS_BASE")
+        return GS_BASE;
+    else
+        printf("No valid register provided. Try again.\n");
+        return NULL; // this might not work
+}
+
 /* TODO uncomment upon ELF merging into main 
 long Operation::get_addr(std::string arg)
 {
@@ -47,6 +108,7 @@ long Operation::get_addr(std::string arg)
     }
 }
     */
+
 
 std::vector<std::string> Operation::get_tokenize_command()
 {
@@ -105,11 +167,6 @@ int Operation::execute_command(std::vector<std::string> arguments)
 
             */
         }
-        else if (command == "clr" || command == "clear")
-        {
-            // TODO
-            std::cout << "Breakpoint removed\n";
-        }
         else if (command == "c" || command == "continue")
         {
             std::cout << "Continuing\n";
@@ -120,19 +177,25 @@ int Operation::execute_command(std::vector<std::string> arguments)
             std::cout << "Stepping into child\n";
             tracee->step_into();
         }
-        else if (command == "bt" || command == "backtrace")
-        {
-            // TODO
-        }
         else if (command == "rr" || command == "readreg")
         {
             // TODO
+            tracee->read_register(,);
         }
         else if (command == "wr" || command == "writereg")
         {
             // TODO
+            tracee->write_register(,,);
         }
         else if (command == "i" || command == "inj" || command == "inject")
+        {
+            // TODO
+        }
+        else if (command == "x" || command == "readmem")
+        {
+            // TODO
+        }
+        else if (command == "set" || command == "writemem")
         {
             // TODO
         }
@@ -140,12 +203,13 @@ int Operation::execute_command(std::vector<std::string> arguments)
         {
             std::cout <<    "Available commands:\n" << 
                             "b/brk/break/breakpoint *HEXADDR\n" <<
-                            "b/brk/break/breakpint SYMBOL\n" <<
-                            "clr/clear *HEXADDR\n" <<
-                            "clr/clear SYMBOL\n" <<
+                            "b/brk/break/breakpoint SYMBOL\n" <<
                             "c/continue\n" <<
                             "si/stepin\n" << 
-                            "bt/backtrace\n"
+                            "rr/readreg ___ " <<
+                            "wr/writereg ___ " <<
+                            "rm"
+                            "i/inj/inject ___"
                             ;
         }
     }
