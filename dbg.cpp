@@ -10,6 +10,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include <array>
 #include <iostream>
 #include <unordered_map>
 #include <unordered_set>
@@ -197,6 +198,45 @@ int Tracee::wait_process_exit() {
     }
 }
 
+unsigned long Tracee::syscall(const unsigned long syscall, const std::array<unsigned long, 6>& args) {
+    // read registers
+    struct user_regs_struct regs;
+    ptrace(PTRACE_GETREGS, child_pid, nullptr, &regs);
+
+    // inject syscall & store prev instr at addr
+    unsigned long instruction_ptr_addr = regs.rip & ~0xfff;  // idk why im page aligning tbh
+    int syscall_code = 0x050f;
+
+    int instruction = 0;  // old value at memory
+    read_memory(instruction_ptr_addr, &instruction, 2);
+    write_memory(instruction_ptr_addr, &syscall_code, 2);  // overwrite to be syscall
+
+    // set regs (INTERFACE UNAVAILABLE)
+    struct user_regs_struct syscall_regs = regs;
+    syscall_regs.rax = syscall;
+    syscall_regs.rdi = args[0];
+    syscall_regs.rsi = args[1];
+    syscall_regs.rdx = args[2];
+    syscall_regs.r10 = args[3];
+    syscall_regs.r8 = args[4];
+    syscall_regs.r9 = args[5];
+    syscall_regs.rip = instruction_ptr_addr;
+    util::throw_errno(ptrace(PTRACE_SETREGS, child_pid, nullptr, &syscall_regs));
+
+    step_into();  // actually run the syscall
+
+    // retrieve return value
+    struct user_regs_struct after;
+    ptrace(PTRACE_GETREGS, child_pid, nullptr, &after);
+    unsigned long rv = after.rax;  // retvals at %rax
+
+    write_memory(instruction_ptr_addr, &instruction, 2);  // restore instruction
+
+    // set regs back
+    util::throw_errno(ptrace(PTRACE_SETREGS, child_pid, nullptr, &regs));
+
+    return rv;
+}
 unsigned long long& get_register_ref(user_regs_struct& regs, Register reg) {
     switch (reg) {
         case R15:

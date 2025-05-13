@@ -36,6 +36,7 @@ enum Register {
     FS,
     GS,
 };
+#include <array>
 
 class Breakpoint {
    public:
@@ -83,4 +84,16 @@ class Tracee {
     uint64_t read_register(Register reg, int size);
 
     void write_register(Register reg, int size, uint64_t value);
+
+    /* Syscall insertion (clobber rcx, r11)
+    args[0] = %rdi
+    args[1] = %rsi
+    args[2] = %rdx
+    args[3] = %r10
+    args[4] = %r8
+    args[5] = %r9
+
+    MUST PASS 6 UNSIGNED LONGS - FILL EXTRA REGISTERS WITH JUNK VALUES IF NECESSARY
+    */
+    unsigned long syscall(const unsigned long syscall, const std::array<unsigned long, 6>& args);
 };
