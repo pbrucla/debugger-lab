@@ -83,6 +83,7 @@ Register Operation::get_register(std::string input)
     else
     {
         perror("No valid register provided. Try again.\n");
+        throw -1;
     }
 }
 
@@ -143,87 +144,103 @@ int Operation::execute_command(std::vector<std::string> arguments)
 {
     std::string command = arguments.at(0);
     
-    // yandere dev energy
-    while (true)
+    if (command == "b" || command == "brk" || command == "break" || command == "breakpoint")
     {
-        if (command == "b" || command == "brk" || command == "break" || command == "breakpoint")
+        /* TODO uncomment upon ELF merging into main
+        // determine if we are working with an address or symbol
+        std::string arg1 = arguments.at(1);
+        long arg1_l = Operation::get_addr(arg1);
+        
+        if (arg1_l == -1)
         {
-            /* TODO uncomment upon ELF merging into main
-            // determine if we are working with an address or symbol
-            std::string arg1 = arguments.at(1);
-            long arg1_l = Operation::get_addr(arg1);
-            
-            if (arg1_l == -1)
-            {
-                std::cout << "This appears to be an invalid symbol. Try again.\n";
-                continue;
-            }
-            else if (arg1_l == -2)
-            {
-                std::cout << "Symbols are not supported at this time. Use addresses for the time being.\n";
-                continue;
-            }
+            std::cout << "This appears to be an invalid symbol. Try again.\n";
+            continue;
+        }
+        else if (arg1_l == -2)
+        {
+            std::cout << "Symbols are not supported at this time. Use addresses for the time being.\n";
+            continue;
+        }
 
-            tracee->insert_breakpoint(arg1_l); // set breakpoint
-            std::cout << "Breakpoint added at" << arg1_l << "\n";
+        tracee->insert_breakpoint(arg1_l); // set breakpoint
+        std::cout << "Breakpoint added at" << arg1_l << "\n";
 
-            */
-        }
-        else if (command == "c" || command == "continue")
-        {
-            std::cout << "Continuing\n";
-            return tracee->continue_process();
-        }
-        else if (command == "si" || command == "stepin")
-        {
-            std::cout << "Stepping into child\n";
-            tracee->step_into();
-        }
-        else if (command == "rr" || command == "readreg")
-        {
-            Register arg1 = get_register(arguments.at(1));
-            int arg2 = std::stoi(arguments.at(2));
-            printf("%lu", tracee->read_register(arg1, arg2));
-        }
-        else if (command == "wr" || command == "writereg")
-        {
-            Register arg1 = get_register(arguments.at(1));
-            int arg2 = stoi(arguments.at(2));
-            unsigned long arg3 = std::stoul(arguments.at(3));
-            tracee->write_register(arg1, arg2, arg3);
-            printf("Written\n");
-        }
-        else if (command == "i" || command == "inj" || command == "inject")
-        {
-            // TODO
-        }
-        else if (command == "x" || command == "readmem")
-        {
-            // TODO
-        }
-        else if (command == "set" || command == "writemem")
-        {
-            // TODO
-        }
-        else
-        {
-            std::cout <<    "Available commands:\n" << 
-                            "b/brk/break/breakpoint *HEXADDR\n" <<
-                            "b/brk/break/breakpoint SYMBOL\n" <<
-                            "c/continue\n" <<
-                            "si/stepin\n" << 
-                            "rr/readreg REG NBYTES\n" <<
-                            "wr/writereg REG NBYTES VALUE\n" <<
-                            "i/inj/inject ___" <<
-                            "x/readmem ___" <<
-                            "set/writemem ___"
-                            ;
-        }
+        */
     }
-    
+    else if (command == "si" || command == "stepin")
+    {
+        std::cout << "Stepping into child\n";
+        tracee->step_into();
+        return 0;
+    }
+    else if (command == "rr" || command == "readreg")
+    {
+        Register arg1 = get_register(arguments.at(1));
+        int arg2 = std::stoi(arguments.at(2));
+        printf("%lu", tracee->read_register(arg1, arg2));
+        return 0;
+    }
+    else if (command == "wr" || command == "writereg")
+    {
+        Register arg1 = get_register(arguments.at(1));
+        int arg2 = stoi(arguments.at(2));
+        unsigned long arg3 = std::stoul(arguments.at(3));
+        tracee->write_register(arg1, arg2, arg3);
+        printf("Written\n");
+        return 0;
+    }
+    else if (command == "i" || command == "inj" || command == "inject")
+    {
+        // TODO
+    }
+    else if (command == "x" || command == "readmem")
+    {
+        // TODO
+    }
+    else if (command == "set" || command == "writemem")
+    {
+        // TODO
+    }
+    else
+    {
+        std::cout <<    "Available commands:\n" << 
+                        "b/brk/break/breakpoint *HEXADDR\n" <<
+                        "b/brk/break/breakpoint SYMBOL\n" <<
+                        "c/continue\n" <<
+                        "si/stepin\n" << 
+                        "rr/readreg REG NBYTES\n" <<
+                        "wr/writereg REG NBYTES VALUE\n" <<
+                        "i/inj/inject ___" <<
+                        "x/readmem ___" <<
+                        "set/writemem ___"
+                        ;
+        return 0;
+    }
 }
 
 int Operation::parse_and_run()
 {
-    return execute_command(get_tokenize_command());
+    while (true)
+    {
+        std::vector<std::string> command = get_tokenize_command();
+
+        if (command.at(0) == "c" || command.at(0) == "continue") // break things off if we want to continue
+        {
+            break;
+        }
+        else // the user wants to do something
+        {
+            try
+            {
+                execute_command(command);
+                std::cout << "\n";
+            }
+            catch(...)
+            {
+                std::cout << "Something went wrong. Reevaluate your commands, and try again.\nFor help, hit ENTER.\n";
+            }
+        }
+    }
+    std::cout << "Continuing\n";
+    return 0;
 }
