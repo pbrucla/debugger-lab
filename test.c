@@ -1,12 +1,11 @@
 #include <stdio.h>
 #include <unistd.h>
+
 #include <cassert>
 
 unsigned long long int x = 0x1234567812345678ULL;
 
-void h() {
-    puts("h called");
-}
+void h() { puts("h called"); }
 
 void g() {
     char x[16];
@@ -21,9 +20,7 @@ void f() {
     puts("f finished");
 }
 
-
 int main(void) {
- 
     f();
     puts("done");
     return 0;

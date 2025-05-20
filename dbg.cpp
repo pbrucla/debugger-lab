@@ -14,13 +14,11 @@
 #include <iostream>
 #include <unordered_map>
 #include <unordered_set>
-
+#include <vector>
 
 #include "util.hpp"
 
 using word = unsigned long;
-
-
 
 Breakpoint::Breakpoint(size_t addr) : addr(addr), injected(false), orig_byte(0) {}
 
@@ -318,29 +316,24 @@ void Tracee::write_register(Register reg, int size, uint64_t value) {
     }
 }
 
-std::pair<uint64_t, uint64_t> Tracee::get_stackframe(uint64_t bp) { //will only go up one layer
+std::pair<uint64_t, uint64_t> Tracee::get_stackframe(uint64_t bp) {  // will only go up one layer
     uint64_t next_bp = 0;
     uint64_t return_address = 0;
     read_memory(bp, &next_bp, 8);
     read_memory(bp + 8, &return_address, 8);
 
-    return{return_address, next_bp};
+    return {return_address, next_bp};
 }
 
-std::vector<int64_t> Tracee::backtrace() { 
+std::vector<int64_t> Tracee::backtrace() {
     std::vector<int64_t> addresses;
-    uint64_t bp = proc.read_register(Register::RBP, 8);
+    uint64_t bp = read_register(Register::RBP, 8);
 
-    int valid = 1;
-    while(valid){
+    while (true) {
         auto [return_address, next_bp] = get_stackframe(bp);
-        unsigned long long addr = ptrace(PTRACE_PEEKDATA, child_pid, return_address, nullptr);
-        if(addr == -1){
-            std::cerr << "Error reading memory at address: " << std::hex << return_address << std::endl;
-            valid = 0;
-        } else if(addr == 0){
-            std::cerr << "Invalid address: " << std::hex << return_address << std::endl;
-            valid = 0;
+        unsigned long long addr = ptrace(PTRACE_PEEKDATA, child_pid, next_bp, nullptr);
+        if (addr == (unsigned long long)-1) {
+            break;
         } else {
             addresses.push_back(return_address);
             bp = next_bp;

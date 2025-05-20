@@ -1,9 +1,9 @@
 #include <sys/wait.h>
 
+#include <cassert>
 #include <cstdlib>
 #include <iostream>
 #include <vector>
-#include <cassert>
 
 #include "dbg.hpp"
 std::unordered_map<uint64_t, uint64_t> fake_memory;
@@ -31,11 +31,15 @@ int main(int argc, char* argv[], char* envp[]) {
         proc.continue_process();
         uint64_t bp = proc.read_register(Register::RBP, 8);
         auto [addresstest, bptest] = proc.get_stackframe(bp);
-        std::cout<<std::hex;
+        std::cout << std::hex;
         std::cout << "bp " << bp << ".\n";
         std::cout << "addresstest " << addresstest << ".\n";
         std::cout << "bptest " << bptest << ".\n";
-        
+        auto bt = proc.backtrace();
+        for (const auto& addr: bt) {
+            std::cout << "backtrace: 0x" << addr << '\n';
+        }
+
         std::cout << "Hit breakpoint. Press ENTER to continue." << std::endl;
         std::cin.get();
         proc.continue_process();
@@ -44,7 +48,6 @@ int main(int argc, char* argv[], char* envp[]) {
         std::cerr << "Got error: " << e.what() << '\n';
         return 1;
     }
-
 
     return 0;
 }
