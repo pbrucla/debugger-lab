@@ -215,7 +215,7 @@ int Operation::execute_command(std::vector<std::string> arguments)
         }
 
         unsigned long retval = tracee->syscall(syscall_num, syscall_args);
-        printf("%#lx", retval);
+        printf("Syscall return: %#lx", retval);
         return 0;
     }
     else if (command == "x" || command == "readmem")
