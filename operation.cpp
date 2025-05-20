@@ -7,16 +7,14 @@
 #include <optional>
 #include "operation.hpp"
 
-// #include "elf.hpp" TODO uncomment upon ELF merging into main
+#include "elf.hpp"
 #include "dbg.hpp"
 
-/* TODO uncomment upon ELF merging into main
 Operation::Operation(Tracee& tracee_arg, ELF& elf_arg)
 {
     tracee = &tracee_arg;
     elf = &elf_arg;
 }
-    */
 
 Operation::Operation(Tracee& tracee_arg)
 {
@@ -87,7 +85,6 @@ Register Operation::get_register(std::string input)
     }
 }
 
-/* TODO uncomment upon ELF merging into main 
 long Operation::get_addr(std::string arg)
 {
     if (arg[0] == '*') // address
@@ -109,7 +106,6 @@ long Operation::get_addr(std::string arg)
         else return -1;
     }
 }
-    */
 
 
 std::vector<std::string> Operation::get_tokenize_command()
@@ -148,25 +144,35 @@ int Operation::execute_command(std::vector<std::string> arguments)
     {
         std::string arg1 = arguments.at(1);
         long arg1_l = Operation::get_addr(arg1);
-        /* TODO uncomment upon ELF merging into main
         // determine if we are working with an address or symbol
         
         
         if (arg1_l == -1)
         {
             std::cout << "This appears to be an invalid symbol. Try again.\n";
-            continue;
+            return -1;
         }
         else if (arg1_l == -2)
         {
             std::cout << "Symbols are not supported at this time. Use addresses for the time being.\n";
-            continue;
+            return -1;
         }
 
         tracee->insert_breakpoint(arg1_l); // set breakpoint
         std::cout << "Breakpoint added at" << arg1_l << "\n";
+        return 0;
 
-        */
+    }
+    else if (command == "bt" || command == "backtrace")
+    {
+        std::vector<long> result = tracee->backtrace();
+        std::cout << "Backtrace:\n";
+        for (int i = 0; i < result.size(); i++)
+        {
+            std::cout << result.at(i) << "\n";
+        }
+        std::cout << "End backtrace\n";
+        return 0;
     }
     else if (command == "si" || command == "stepin")
     {
@@ -219,6 +225,7 @@ int Operation::execute_command(std::vector<std::string> arguments)
     else
     {
         std::cout <<    "Available commands:\n" << 
+                        "bt/backtrace\n" <<
                         "b/brk/break/breakpoint *0xHEXADDR\n" <<
                         "b/brk/break/breakpoint SYMBOL\n" <<
                         "c/continue\n" <<

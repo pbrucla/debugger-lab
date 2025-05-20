@@ -8,17 +8,17 @@
 #include <iostream>
 #include <optional>
 
-// #include "elf.hpp" TODO uncomment upon ELF merging into main
+#include "elf.hpp" TODO uncomment upon ELF merging into main
 #include "dbg.hpp"
 
 class Operation {
     public:
-        // Operation(Tracee& tracee_arg, ELF& elf_arg); TODO uncomment upon ELF merging into main
+        Operation(Tracee& tracee_arg, ELF& elf_arg);
         Operation(Tracee& tracee_arg);
         int parse_and_run();
 
     private:
-        // ELF* elf;
+        ELF* elf;
         Tracee* tracee = NULL;
         long get_addr(std::string arg);
         Register get_register(std::string input);
