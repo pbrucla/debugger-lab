@@ -87,9 +87,10 @@ Register Operation::get_register(std::string input)
 
 long Operation::get_addr(std::string arg)
 {
-    if (arg[0] == '*') // address
+    if (isdigit(arg[0])) // address
     {
-        return std::stoul(arg.substr(1), NULL, 16); // drop the asterisk, convert to unsigned long
+        
+        return std::stoul(arg, NULL, 16); // drop the asterisk, convert to unsigned long
     }
     else // symbol
     {
@@ -204,9 +205,9 @@ int Operation::execute_command(std::vector<std::string> arguments)
         std::string arg1 = arguments.at(1);
         long arg1_l = Operation::get_addr(arg1);
         long arg2_l = std::stoul(arguments.at(2));
-        std::string output;
+        unsigned long output;
         tracee->read_memory(arg1_l, &output, arg2_l);
-        std::cout << output << "\n";
+        printf("%#lx", output);
         return 0;
     }
     else if (command == "set" || command == "writemem")
