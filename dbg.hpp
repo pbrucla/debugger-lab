@@ -38,6 +38,7 @@ enum Register {
     FS,
     GS,
 };
+#include <array>
 
 class Breakpoint {
    public:
@@ -90,4 +91,6 @@ class Tracee {
     std::pair<uint64_t, uint64_t> get_stackframe(uint64_t bp);
 
     std::vector<int64_t> backtrace();
+
+    unsigned long syscall(const unsigned long syscall, const std::array<unsigned long, 6>& args);
 };
