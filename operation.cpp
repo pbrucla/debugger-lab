@@ -146,10 +146,11 @@ int Operation::execute_command(std::vector<std::string> arguments)
     
     if (command == "b" || command == "brk" || command == "break" || command == "breakpoint")
     {
-        /* TODO uncomment upon ELF merging into main
-        // determine if we are working with an address or symbol
         std::string arg1 = arguments.at(1);
         long arg1_l = Operation::get_addr(arg1);
+        /* TODO uncomment upon ELF merging into main
+        // determine if we are working with an address or symbol
+        
         
         if (arg1_l == -1)
         {
@@ -195,24 +196,40 @@ int Operation::execute_command(std::vector<std::string> arguments)
     }
     else if (command == "x" || command == "readmem")
     {
-        // TODO
+        std::string arg1 = arguments.at(1);
+        long arg1_l = Operation::get_addr(arg1);
+        long arg2_l = std::stoul(arguments.at(2));
+        std::string output;
+        tracee->read_memory(arg1_l, &output, arg2_l);
+        std::cout << output << "\n";
+        return 0;
     }
     else if (command == "set" || command == "writemem")
     {
-        // TODO
+        std::string arg1 = arguments.at(1);
+        long arg1_l = Operation::get_addr(arg1);
+        long arg2_l = std::stoul(arguments.at(2));
+        long arg3_l = std::stoul(arguments.at(3));
+
+        tracee->write_memory(arg1_l, &arg3_l, arg2_l);
+
+        std::cout << "Written\n";
+        return 0;
     }
     else
     {
         std::cout <<    "Available commands:\n" << 
-                        "b/brk/break/breakpoint *HEXADDR\n" <<
+                        "b/brk/break/breakpoint *0xHEXADDR\n" <<
                         "b/brk/break/breakpoint SYMBOL\n" <<
                         "c/continue\n" <<
                         "si/stepin\n" << 
                         "rr/readreg REG NBYTES\n" <<
                         "wr/writereg REG NBYTES VALUE\n" <<
                         "i/inj/inject ___" <<
-                        "x/readmem ___" <<
-                        "set/writemem ___"
+                        "x/readmem *0xHEXADDR SIZE\n" <<
+                        "x/readmem SYMBOL SIZE\n" <<
+                        "set/writemem *0xHEXADDR SIZE VALUE\n" <<
+                        "set/writemem SYMBOL SIZE VALUE\n"
                         ;
         return 0;
     }
