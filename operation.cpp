@@ -111,7 +111,7 @@ long Operation::get_addr(std::string arg)
 std::vector<std::string> Operation::get_tokenize_command()
 {
     std::vector<std::string> command_arguments;
-    std::string command = readline(NULL);
+    std::string command = readline("cydbg> ");
     int command_len = command.size();
     int begin_substring = 0;
     int substring_len = 0;
@@ -183,8 +183,7 @@ int Operation::execute_command(std::vector<std::string> arguments)
     else if (command == "rr" || command == "readreg")
     {
         Register arg1 = get_register(arguments.at(1));
-        int arg2 = std::stoi(arguments.at(2));
-        printf("%lu", tracee->read_register(arg1, arg2));
+        printf("%#lx", tracee->read_register(arg1, 8));
         return 0;
     }
     else if (command == "wr" || command == "writereg")
@@ -230,7 +229,7 @@ int Operation::execute_command(std::vector<std::string> arguments)
                         "b/brk/break/breakpoint SYMBOL\n" <<
                         "c/continue\n" <<
                         "si/stepin\n" << 
-                        "rr/readreg REG NBYTES\n" <<
+                        "rr/readreg REG\n" <<
                         "wr/writereg REG NBYTES VALUE\n" <<
                         "i/inj/inject ___" <<
                         "x/readmem *0xHEXADDR SIZE\n" <<

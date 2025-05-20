@@ -8,7 +8,7 @@
 #include <iostream>
 #include <optional>
 
-#include "elf.hpp" TODO uncomment upon ELF merging into main
+#include "elf.hpp"
 #include "dbg.hpp"
 
 class Operation {
