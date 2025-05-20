@@ -190,15 +190,33 @@ int Operation::execute_command(std::vector<std::string> arguments)
     else if (command == "wr" || command == "writereg")
     {
         Register arg1 = get_register(arguments.at(1));
-        int arg2 = stoi(arguments.at(2));
-        unsigned long arg3 = std::stoul(arguments.at(3));
-        tracee->write_register(arg1, arg2, arg3);
+        unsigned long arg2 = std::stoul(arguments.at(2));
+        tracee->write_register(arg1, 8, arg2);
         printf("Written\n");
         return 0;
     }
     else if (command == "i" || command == "inj" || command == "inject")
     {
-        // TODO
+        // i/inj/inject SYSCALL_NUM VALUE
+        // the user must provide all 6 syscall arguments
+        unsigned long syscall_num = std::stoul(arguments.at(1));
+
+        std::array<unsigned long, 6> syscall_args;
+
+        if (arguments.size() < 8) // not enough args
+        {
+            std::cout << "You don't have enough arguments. Provide a syscall value and 6 arguments.\n For more, hit ENTER.\n";
+            return -1; 
+        }
+
+        for (int i = 0; i < 6; i++)
+        {
+            syscall_args[i] = std::stoul(arguments[i + 2]);
+        }
+
+        unsigned long retval = tracee->syscall(syscall_num, syscall_args);
+        printf("%#lx", retval);
+        return 0;
     }
     else if (command == "x" || command == "readmem")
     {
@@ -226,18 +244,17 @@ int Operation::execute_command(std::vector<std::string> arguments)
     {
         std::cout <<    "Available commands:\n" << 
                         "bt/backtrace\n" <<
-                        "b/brk/break/breakpoint *0xHEXADDR\n" <<
+                        "b/brk/break/breakpoint 0xHEXADDR\n" <<
                         "b/brk/break/breakpoint SYMBOL\n" <<
                         "c/continue\n" <<
                         "si/stepin\n" << 
                         "rr/readreg REG\n" <<
-                        "wr/writereg REG NBYTES VALUE\n" <<
-                        "i/inj/inject ___" <<
-                        "x/readmem *0xHEXADDR SIZE\n" <<
+                        "wr/writereg REG DATA\n" <<
+                        "i/inj/inject SYSCALL_NUM RDI RSI RDX R10 R8 R9\n" <<
+                        "x/readmem 0xHEXADDR SIZE\n" <<
                         "x/readmem SYMBOL SIZE\n" <<
-                        "set/writemem *0xHEXADDR SIZE VALUE\n" <<
-                        "set/writemem SYMBOL SIZE VALUE\n"
-                        ;
+                        "set/writemem 0xHEXADDR SIZE DATA\n" <<
+                        "set/writemem SYMBOL SIZE DATA\n";
         return 0;
     }
 }
