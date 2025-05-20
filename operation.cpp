@@ -166,7 +166,8 @@ int Operation::execute_command(std::vector<std::string> arguments)
     }
     else if (command == "bt" || command == "backtrace")
     {
-        std::vector<long> result = tracee->backtrace();
+        std::vector<int64_t> result = tracee->backtrace();
+        
         std::cout << "Backtrace:\n";
         for (int i = 0; i < result.size(); i++)
         {
