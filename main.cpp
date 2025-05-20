@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "dbg.hpp"
+#include "elf.hpp"
 
 unsigned long long int x = 0x1337133713371337ULL;
 
@@ -16,6 +17,9 @@ int main(int argc, char* argv[], char* envp[]) {
     }
 
     char* const progname = argv[1];
+    ELF elf(progname);
+    auto main_sym = elf.lookup_sym("main");
+    printf("main: %#lx\n", main_sym.value());
     std::vector<char*> args;
     args.push_back(progname);
     args.insert(args.end(), argv + 2, argv + argc);
