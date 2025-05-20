@@ -193,13 +193,12 @@ int Tracee::wait_process_exit() {
     }
 }
 
-int Tracee::disassemble(int lineNumber, size_t address, std::vector<cs_insn*>& disassembledInstructions){
-    // std::cout << "hellos" << std::endl;
-
+int Tracee::disassemble(int lineNumber, size_t address){
     csh handle;
     cs_open(CS_ARCH_X86, CS_MODE_64, &handle);
     cs_insn *insn = cs_malloc(handle);
     uint8_t code[16];
+    std::vector<cs_insn*> disassembledInstructions;
     // Read only a few instructions at a time, take the first one, move to the address at the beginning of the next instruction
     
     int i = 0;
@@ -235,11 +234,7 @@ int Tracee::disassemble(int lineNumber, size_t address, std::vector<cs_insn*>& d
         i++;  
     }
     cs_close(&handle);
-    return 0;
-}
 
-int Tracee::print_disassemble(std::vector<cs_insn*> disassembledInstructions) {
-    std::cout << std::endl << std::endl << "print disassemble called" << std::endl;
     if(disassembledInstructions.empty()) {
         std::cerr << "print_disassemble: No instructions to print" << std::endl;
         return -1;
@@ -248,6 +243,10 @@ int Tracee::print_disassemble(std::vector<cs_insn*> disassembledInstructions) {
     std::cerr << "base address: " << base_address << std::endl;
     for (auto instr : disassembledInstructions) {
         std::cout << std::hex << instr->address << " <+" << instr->address-base_address << ">:\t" << instr->mnemonic << "\t" << instr->op_str << std::endl;
+    }
+
+    for (cs_insn* i : disassembledInstructions) {
+        free(i);
     }
     return 0;
 }

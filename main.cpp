@@ -30,10 +30,8 @@ int main(int argc, char* argv[], char* envp[]) {
         // proc.read_memory(0x407008, &x, sizeof(x));
         // std::cout << "Read a value of: " << std::hex << x << std::dec << '\n';
         
-        std::vector<cs_insn*> test_insn;
         std::cout << "before disassemble\n";
-        proc.disassemble(5, 0x4010b8, test_insn);
-        proc.print_disassemble(test_insn);
+        proc.disassemble(10, 0x4010bb);
         std::cout << "after disassemble\n";
 
         // proc.insert_breakpoint(0x40119d);
