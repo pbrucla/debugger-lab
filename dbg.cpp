@@ -11,6 +11,7 @@
 #include <unistd.h>
 
 #include <iostream>
+#include <iomanip>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -192,48 +193,61 @@ int Tracee::wait_process_exit() {
     }
 }
 
-int Tracee::disassemble(int lineNumber, size_t address, std::vector<cs_insn*> disassembledInstructions){
+int Tracee::disassemble(int lineNumber, size_t address, std::vector<cs_insn*>& disassembledInstructions){
+    // std::cout << "hellos" << std::endl;
+
     csh handle;
-    cs_open(CS_ARCH_X86, CS_MODE_32, &handle);
-    cs_insn *insn;
-    word* val; // = static_cast<word*>(malloc(1));
-
-    u_int8_t *CODE = (u_int8_t *)malloc(16*lineNumber);
-    std::cout << "hellos" << std::endl;
-    size_t i;
-    for (i=0; i < 16*lineNumber; i++) {
-        read_memory(reinterpret_cast<size_t>(address + i*8), val, sizeof(val));
-        std::cout << *(static_cast<word*>(val)) << std::endl;
-        *(CODE+i) = *val;
-    }
-    std::cout << "bye bye" << std::endl;
+    cs_open(CS_ARCH_X86, CS_MODE_64, &handle);
+    cs_insn *insn = cs_malloc(handle);
+    uint8_t code[16];
+    // Read only a few instructions at a time, take the first one, move to the address at the beginning of the next instruction
     
-    size_t successfulCount = cs_disasm(handle, CODE , sizeof(CODE)-1, address, lineNumber, &insn);
-    std::cout << "after cs_disasm" << std::endl;
-    if (successfulCount > 0) {
-        std::cout << "huh" << std::endl;
-        size_t j;
-        for (j = 0; j < successfulCount; j++) {
-            disassembledInstructions.push_back(&insn[j]);
-        }
-        std::cout << "bruhasdf" << std::endl;
-        cs_free(insn, successfulCount);
-    } else {
-        std::cerr << "Could not disassemble\n";
-        return -1; 
-    }
+    int i = 0;
+    while (i < lineNumber) {
+        // std::cerr << std::endl << std::endl;
+        // std::cerr << "decoding address: "<< address << std::endl;
+        read_memory(reinterpret_cast<size_t>(address), &code, 16);
 
+        // printf("Bytes: ");
+        // for (int j = 0; j < 16; ++j) {
+        //     printf("%02x ", code[j]);
+        // }
+        // printf("\n");
+
+        size_t count = cs_disasm(handle, code, 16, address, 1, &insn);
+        if (count > 0) {
+            // std::cerr << "pushing instruction in: " << std::hex << insn[0].address << std::endl;
+            // std::cerr << "Instruction is size: " << insn[0].size << std::endl;
+            // Move to the next instruction
+            
+            cs_insn *copy = (cs_insn *)malloc(sizeof(cs_insn));
+            memcpy(copy, &insn[0], sizeof(cs_insn));
+            disassembledInstructions.push_back(copy);
+
+            address += insn[0].size;
+            cs_free(insn, count);
+
+        } else {
+            std::cerr << "disassemble: Could not disassemble instruction " << i+1 << std::endl;
+            cs_close(&handle);
+            return -1;
+        }
+        i++;  
+    }
     cs_close(&handle);
     return 0;
 }
 
 int Tracee::print_disassemble(std::vector<cs_insn*> disassembledInstructions) {
+    std::cout << std::endl << std::endl << "print disassemble called" << std::endl;
     if(disassembledInstructions.empty()) {
+        std::cerr << "print_disassemble: No instructions to print" << std::endl;
         return -1;
     }
     ulong base_address = disassembledInstructions[0]->address;
+    std::cerr << "base address: " << base_address << std::endl;
     for (auto instr : disassembledInstructions) {
-        std::cout << instr->address << " <+" << instr->address-base_address << ">:\t" << instr->mnemonic << "\t" << instr->op_str << std::endl;
+        std::cout << std::hex << instr->address << " <+" << instr->address-base_address << ">:\t" << instr->mnemonic << "\t" << instr->op_str << std::endl;
     }
     return 0;
 }

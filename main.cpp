@@ -32,7 +32,7 @@ int main(int argc, char* argv[], char* envp[]) {
         
         std::vector<cs_insn*> test_insn;
         std::cout << "before disassemble\n";
-        proc.disassemble(5, 0x40105b, test_insn);
+        proc.disassemble(5, 0x4010b8, test_insn);
         proc.print_disassemble(test_insn);
         std::cout << "after disassemble\n";
 
