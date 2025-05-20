@@ -277,6 +277,18 @@ int Operation::parse_and_run()
                 execute_command(command);
                 std::cout << "\n";
             }
+            catch(int errorcode)
+            {
+                std::cout << "Something went wrong. Reevaluate your commands, and try again.\nFor help, hit ENTER.\n" <<
+                "Errorno thrown: " << errorcode << "\n";
+            }
+            catch(std::runtime_error& error)
+            {
+                std::cout << "Something went wrong. Reevaluate your commands, and try again.\nFor help, hit ENTER.\n";
+                const char* errordesc = error.what();
+                printf("Error description: %s\n", errordesc);
+
+            }
             catch(...)
             {
                 std::cout << "Something went wrong. Reevaluate your commands, and try again.\nFor help, hit ENTER.\n";
