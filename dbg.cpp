@@ -5,6 +5,7 @@
 #include <signal.h>
 #include <stdint.h>
 #include <string.h>
+#include <sys/personality.h>
 #include <sys/ptrace.h>
 #include <sys/user.h>
 #include <sys/wait.h>
@@ -14,6 +15,7 @@
 #include <iostream>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 #include "util.hpp"
 
@@ -116,6 +118,8 @@ void Tracee::spawn_process(const char* pathname, char* const argv[], char* const
     pid_t pid = util::throw_errno(fork());
     if (pid == 0) {
         // child
+        int persona = personality(0xffffffffULL);
+        personality(persona | ADDR_NO_RANDOMIZE);
         util::throw_errno(ptrace(PTRACE_TRACEME, 0, nullptr, nullptr));
         util::throw_errno(execve(pathname, argv, envp));
     } else {
@@ -350,4 +354,30 @@ void Tracee::write_register(Register reg, int size, uint64_t value) {
         perror("ptrace(PTRACE_SETREGS)");
         throw std::runtime_error("Failed to set registers");
     }
+}
+
+std::pair<uint64_t, uint64_t> Tracee::get_stackframe(uint64_t bp) {  // will only go up one layer
+    uint64_t next_bp = 0;
+    uint64_t return_address = 0;
+    read_memory(bp, &next_bp, 8);
+    read_memory(bp + 8, &return_address, 8);
+
+    return {return_address, next_bp};
+}
+
+std::vector<int64_t> Tracee::backtrace() {
+    std::vector<int64_t> addresses;
+    uint64_t bp = read_register(Register::RBP, 8);
+
+    while (true) {
+        auto [return_address, next_bp] = get_stackframe(bp);
+        unsigned long long addr = ptrace(PTRACE_PEEKDATA, child_pid, next_bp, nullptr);
+        if (addr == (unsigned long long)-1) {
+            break;
+        } else {
+            addresses.push_back(return_address);
+            bp = next_bp;
+        }
+    }
+    return addresses;
 }

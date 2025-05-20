@@ -6,6 +6,8 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
+#include <vector>
 
 enum Register {
     R15,
@@ -85,15 +87,10 @@ class Tracee {
 
     void write_register(Register reg, int size, uint64_t value);
 
-    /* Syscall insertion (clobber rcx, r11)
-    args[0] = %rdi
-    args[1] = %rsi
-    args[2] = %rdx
-    args[3] = %r10
-    args[4] = %r8
-    args[5] = %r9
+    // Gets the current stack frame, returning a (return address, parent frame pointer) base.
+    std::pair<uint64_t, uint64_t> get_stackframe(uint64_t bp);
 
-    MUST PASS 6 UNSIGNED LONGS - FILL EXTRA REGISTERS WITH JUNK VALUES IF NECESSARY
-    */
+    std::vector<int64_t> backtrace();
+
     unsigned long syscall(const unsigned long syscall, const std::array<unsigned long, 6>& args);
 };
