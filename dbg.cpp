@@ -327,19 +327,24 @@ std::pair<uint64_t, uint64_t> Tracee::get_stackframe(uint64_t bp) { //will only 
     return{return_address, next_bp};
 }
 
-void Tracee::bactrace() { 
+std::vector<int64_t> Tracee::backtrace() { 
+    std::vector<int64_t> addresses;
     uint64_t bp = proc.read_register(Register::RBP, 8);
-    uint64_t next_bp = 0;
-    uint64_t return_address = 0;
 
     int valid = 1;
     while(valid){
-        return_address, next_bp = get_stackframe(bp);
+        auto [return_address, next_bp] = get_stackframe(bp);
         unsigned long long addr = ptrace(PTRACE_PEEKDATA, child_pid, return_address, nullptr);
         if(addr == -1){
+            std::cerr << "Error reading memory at address: " << std::hex << return_address << std::endl;
+            valid = 0;
+        } else if(addr == 0){
+            std::cerr << "Invalid address: " << std::hex << return_address << std::endl;
             valid = 0;
         } else {
-            std::cout<< addr << std::endl;
+            addresses.push_back(return_address);
+            bp = next_bp;
         }
     }
+    return addresses;
 }
