@@ -25,10 +25,12 @@ inline T throw_errno(T val, std::source_location loc = std::source_location::cur
     return val;
 }
 
-inline void throw_assert(bool val, const char* msg = nullptr, std::source_location loc = std::source_location::current()) {
+inline void throw_assert(bool val, const char* msg = nullptr,
+                         std::source_location loc = std::source_location::current()) {
     if (!val) {
         char buf[256];
-        snprintf(buf, sizeof(buf), "%s:%d:%d in %s: %s", loc.file_name(), loc.line(), loc.column(), loc.function_name(), msg ? msg : "assertion failed");
+        snprintf(buf, sizeof(buf), "%s:%d:%d in %s: %s", loc.file_name(), loc.line(), loc.column(), loc.function_name(),
+                 msg ? msg : "assertion failed");
         throw std::runtime_error(buf);
     }
 }

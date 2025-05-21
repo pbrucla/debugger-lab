@@ -1,3 +1,4 @@
+#include <capstone/capstone.h>
 #include <sys/wait.h>
 
 #include <cassert>
@@ -32,10 +33,9 @@ int main(int argc, char* argv[], char* envp[]) {
 
     try {
         proc.spawn_process(progname, args.data(), envp);
-        while (true)
-        {
+        while (true) {
             op.parse_and_run();
-        }        
+        }
     } catch (const std::system_error& e) {
         std::cerr << "Got error: " << e.what() << '\n';
         return 1;
