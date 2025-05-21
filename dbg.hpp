@@ -83,10 +83,8 @@ class Tracee {
     void write_memory(size_t addr, const void* data, size_t sz);
     // Inserts a breakpoint at address `addr` in the child process.
     void insert_breakpoint(size_t addr);
-<<<<<<< HEAD
     // Prints out a number of disassembled instructions starting from address
     int disassemble(int lineNumber, size_t address);
-=======
 
     uint64_t read_register(Register reg, int size);
 
@@ -98,5 +96,4 @@ class Tracee {
     std::vector<int64_t> backtrace();
 
     unsigned long syscall(const unsigned long syscall, const std::array<unsigned long, 6>& args);
->>>>>>> main
 };

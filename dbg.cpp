@@ -140,21 +140,6 @@ int Tracee::continue_process() {
         std::cerr << "Cannot continue stopped process\n";
         return 0;
     }
-<<<<<<< HEAD
-
-    int status;
-    if (breakpoint_hit) {
-        struct user_regs_struct regs;
-        printf("before getregs\n");
-        util::throw_errno(ptrace(PTRACE_GETREGS, child_pid, nullptr, &regs));
-        printf("after getregs\n");
-        size_t pc = regs.rip;
-        printf("before step\n");
-        step_into();
-        printf("after step\n");
-        insert_breakpoint(pc);
-        breakpoint_hit = false;
-=======
 
     int status;
     if (breakpoint_hit) {
@@ -167,7 +152,6 @@ int Tracee::continue_process() {
             step_into();
             inject_breakpoint(it->second);
         }
->>>>>>> main
     }
 
     util::throw_errno(ptrace(PTRACE_CONT, child_pid, NULL, NULL));
