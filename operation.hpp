@@ -1,9 +1,9 @@
 #ifndef OPERATION_GRD
 #define OPERATION_GRD
+#include <cstdio>
 #include <readline/history.h>
 #include <readline/readline.h>  // if you have issues, consider installing readline-dev or readline-devel
 
-#include <cstdio>
 #include <iostream>
 #include <optional>
 #include <string>

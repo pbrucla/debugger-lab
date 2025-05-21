@@ -1,9 +1,9 @@
 #include "operation.hpp"
 
+#include <cstdio>
 #include <readline/history.h>
 #include <readline/readline.h>  // if you have issues, consider installing readline-dev or readline-devel
 
-#include <cstdio>
 #include <iostream>
 #include <optional>
 #include <string>
@@ -148,7 +148,7 @@ int Operation::execute_command(std::vector<std::string> arguments) {
     } else if (command == "bt" || command == "backtrace") {
         std::vector<long> result = tracee->backtrace();
         std::cout << "Backtrace:\n";
-        for (int i = 0; i < result.size(); i++) {
+        for (unsigned long i = 0; i < result.size(); i++) {
             std::cout << result.at(i) << "\n";
         }
         std::cout << "End backtrace\n";
@@ -169,6 +169,7 @@ int Operation::execute_command(std::vector<std::string> arguments) {
         printf("Written\n");
         return 0;
     } else if (command == "i" || command == "inj" || command == "inject") {
+        return 0;
         // TODO
     } else if (command == "x" || command == "readmem") {
         std::string arg1 = arguments.at(1);
