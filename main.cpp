@@ -1,11 +1,14 @@
+#include <capstone/capstone.h>
 #include <sys/wait.h>
 
+#include <cassert>
 #include <cstdlib>
 #include <iostream>
 #include <vector>
-#include <capstone/capstone.h>
 
 #include "dbg.hpp"
+#include "elf.hpp"
+#include "operation.hpp"
 
 unsigned long long int x = 0x1337133713371337ULL;
 
@@ -17,39 +20,26 @@ int main(int argc, char* argv[], char* envp[]) {
     }
 
     char* const progname = argv[1];
+    ELF elf(progname);
+    auto main_sym = elf.lookup_sym("main");
+    printf("main: %#lx\n", main_sym.value());
     std::vector<char*> args;
     args.push_back(progname);
     args.insert(args.end(), argv + 2, argv + argc);
     args.push_back(nullptr);
 
     Tracee proc;
+    Operation op(proc, elf);
 
     try {
         proc.spawn_process(progname, args.data(), envp);
-        // unsigned long long x;
-        // proc.read_memory(0x407008, &x, sizeof(x));
-        // std::cout << "Read a value of: " << std::hex << x << std::dec << '\n';
-        
-        std::cout << "before disassemble\n";
-        proc.disassemble(10, 0x4010bb);
-        std::cout << "after disassemble\n";
-
-        // proc.insert_breakpoint(0x40119d);
-        // proc.continue_process();
-        // std::cout << "Hit breakpoint. Press ENTER to continue." << std::endl;
-        // std::cin.get();
-        // proc.continue_process();
-        // std::cout << "Hit breakpoint. Press ENTER to continue." << std::endl;
-        // std::cin.get();
-        // proc.continue_process();
-        // std::cout << "Hit breakpoint. Press ENTER to continue." << std::endl;
-        // std::cin.get();
-        // proc.continue_process();
-        // int exit = proc.wait_process_exit();
-        // std::cout << "Got exit code " << exit << ".\n";
+        while (true) {
+            op.parse_and_run();
+        }
     } catch (const std::system_error& e) {
         std::cerr << "Got error: " << e.what() << '\n';
         return 1;
     }
+
     return 0;
 }

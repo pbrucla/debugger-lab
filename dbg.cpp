@@ -5,15 +5,18 @@
 #include <signal.h>
 #include <stdint.h>
 #include <string.h>
+#include <sys/personality.h>
 #include <sys/ptrace.h>
 #include <sys/user.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
-#include <iostream>
+#include <array>
 #include <iomanip>
+#include <iostream>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 #include "util.hpp"
 
@@ -62,6 +65,9 @@ void Tracee::step_into() {
         return;
     }
     util::throw_errno(ptrace(PTRACE_SINGLESTEP, child_pid, nullptr, nullptr));
+    int status;
+    util::throw_errno(waitpid(child_pid, &status, 0));
+    assert(WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP);
 }
 
 void Tracee::read_memory(size_t addr, void* out, size_t sz) {
@@ -113,6 +119,8 @@ void Tracee::spawn_process(const char* pathname, char* const argv[], char* const
     pid_t pid = util::throw_errno(fork());
     if (pid == 0) {
         // child
+        int persona = personality(0xffffffffULL);
+        personality(persona | ADDR_NO_RANDOMIZE);
         util::throw_errno(ptrace(PTRACE_TRACEME, 0, nullptr, nullptr));
         util::throw_errno(execve(pathname, argv, envp));
     } else {
@@ -132,10 +140,10 @@ int Tracee::continue_process() {
         std::cerr << "Cannot continue stopped process\n";
         return 0;
     }
-    
+<<<<<<< HEAD
+
     int status;
-    if(breakpoint_hit)
-    {
+    if (breakpoint_hit) {
         struct user_regs_struct regs;
         printf("before getregs\n");
         util::throw_errno(ptrace(PTRACE_GETREGS, child_pid, nullptr, &regs));
@@ -146,6 +154,20 @@ int Tracee::continue_process() {
         printf("after step\n");
         insert_breakpoint(pc);
         breakpoint_hit = false;
+=======
+
+    int status;
+    if (breakpoint_hit) {
+        struct user_regs_struct regs;
+        util::throw_errno(ptrace(PTRACE_GETREGS, child_pid, nullptr, &regs));
+        size_t pc = regs.rip;
+        auto it = breakpoints.find(pc);
+        breakpoint_hit = false;
+        if (it != breakpoints.end()) {
+            step_into();
+            inject_breakpoint(it->second);
+        }
+>>>>>>> main
     }
 
     util::throw_errno(ptrace(PTRACE_CONT, child_pid, NULL, NULL));
@@ -163,12 +185,16 @@ int Tracee::continue_process() {
         }
     }
     if (WIFEXITED(status) || WIFSIGNALED(status)) {
+        std::cerr << "process exited\n";
         child_pid = NOCHILD;
     }
     return status;
 }
 
 void Tracee::insert_breakpoint(size_t addr) {
+    if (breakpoints.count(addr) > 0) {
+        return;
+    }
     auto [it, _] = breakpoints.emplace(addr, addr);
     Breakpoint& bp = it->second;
     if (child_pid != NOCHILD) {
@@ -193,14 +219,15 @@ int Tracee::wait_process_exit() {
     }
 }
 
-int Tracee::disassemble(int lineNumber, size_t address){
+int Tracee::disassemble(int lineNumber, size_t address) {
     csh handle;
     cs_open(CS_ARCH_X86, CS_MODE_64, &handle);
-    cs_insn *insn = cs_malloc(handle);
+    cs_insn* insn = cs_malloc(handle);
     uint8_t code[16];
     std::vector<cs_insn*> disassembledInstructions;
-    // Read only a few instructions at a time, take the first one, move to the address at the beginning of the next instruction
-    
+    // Read only a few instructions at a time, take the first one, move to the address at the beginning of the next
+    // instruction
+
     int i = 0;
     while (i < lineNumber) {
         read_memory(reinterpret_cast<size_t>(address), &code, 16);
@@ -208,8 +235,8 @@ int Tracee::disassemble(int lineNumber, size_t address){
         size_t count = cs_disasm(handle, code, 16, address, 1, &insn);
         if (count > 0) {
             // Move to the next instruction
-            
-            cs_insn *copy = (cs_insn *)malloc(sizeof(cs_insn));
+
+            cs_insn* copy = (cs_insn*)malloc(sizeof(cs_insn));
             memcpy(copy, &insn[0], sizeof(cs_insn));
             disassembledInstructions.push_back(copy);
 
@@ -217,25 +244,207 @@ int Tracee::disassemble(int lineNumber, size_t address){
             cs_free(insn, count);
 
         } else {
-            std::cerr << "disassemble: Could not disassemble instruction " << i+1 << std::endl;
+            std::cerr << "disassemble: Could not disassemble instruction " << i + 1 << std::endl;
             cs_close(&handle);
             return -1;
         }
-        i++;  
+        i++;
     }
     cs_close(&handle);
 
-    if(disassembledInstructions.empty()) {
+    if (disassembledInstructions.empty()) {
         std::cerr << "disassemble: No instructions to print" << std::endl;
         return -1;
     }
     ulong base_address = disassembledInstructions[0]->address;
     for (auto instr : disassembledInstructions) {
-        std::cout << std::hex << instr->address << " <+" << instr->address-base_address << ">:\t" << instr->mnemonic << "\t" << instr->op_str << std::endl;
+        std::cout << std::hex << instr->address << " <+" << instr->address - base_address << ">:\t" << instr->mnemonic
+                  << "\t" << instr->op_str << std::endl;
     }
 
     for (cs_insn* i : disassembledInstructions) {
         free(i);
     }
     return 0;
+}
+
+unsigned long Tracee::syscall(const unsigned long syscall, const std::array<unsigned long, 6>& args) {
+    // read registers
+    struct user_regs_struct regs;
+    ptrace(PTRACE_GETREGS, child_pid, nullptr, &regs);
+
+    // inject syscall & store prev instr at addr
+    unsigned long instruction_ptr_addr = regs.rip & ~0xfff;  // idk why im page aligning tbh
+    int syscall_code = 0x050f;
+
+    int instruction = 0;  // old value at memory
+    read_memory(instruction_ptr_addr, &instruction, 2);
+    write_memory(instruction_ptr_addr, &syscall_code, 2);  // overwrite to be syscall
+
+    // set regs (INTERFACE UNAVAILABLE)
+    struct user_regs_struct syscall_regs = regs;
+    syscall_regs.rax = syscall;
+    syscall_regs.rdi = args[0];
+    syscall_regs.rsi = args[1];
+    syscall_regs.rdx = args[2];
+    syscall_regs.r10 = args[3];
+    syscall_regs.r8 = args[4];
+    syscall_regs.r9 = args[5];
+    syscall_regs.rip = instruction_ptr_addr;
+    util::throw_errno(ptrace(PTRACE_SETREGS, child_pid, nullptr, &syscall_regs));
+
+    step_into();  // actually run the syscall
+
+    // retrieve return value
+    struct user_regs_struct after;
+    ptrace(PTRACE_GETREGS, child_pid, nullptr, &after);
+    unsigned long rv = after.rax;  // retvals at %rax
+
+    write_memory(instruction_ptr_addr, &instruction, 2);  // restore instruction
+
+    // set regs back
+    util::throw_errno(ptrace(PTRACE_SETREGS, child_pid, nullptr, &regs));
+
+    return rv;
+}
+
+unsigned long long& get_register_ref(user_regs_struct& regs, Register reg) {
+    switch (reg) {
+        case R15:
+            return regs.r15;
+        case R14:
+            return regs.r14;
+        case R13:
+            return regs.r13;
+        case R12:
+            return regs.r12;
+        case RBP:
+            return regs.rbp;
+        case RBX:
+            return regs.rbx;
+        case R11:
+            return regs.r11;
+        case R10:
+            return regs.r10;
+        case R9:
+            return regs.r9;
+        case R8:
+            return regs.r8;
+        case RAX:
+            return regs.rax;
+        case RCX:
+            return regs.rcx;
+        case RDX:
+            return regs.rdx;
+        case RSI:
+            return regs.rsi;
+        case RDI:
+            return regs.rdi;
+        case ORIG_RAX:
+            return regs.orig_rax;
+        case RIP:
+            return regs.rip;
+        case CS:
+            return regs.cs;
+        case EFLAGS:
+            return regs.eflags;
+        case RSP:
+            return regs.rsp;
+        case SS:
+            return regs.ss;
+        case FS_BASE:
+            return regs.fs_base;
+        case GS_BASE:
+            return regs.gs_base;
+        case DS:
+            return regs.ds;
+        case ES:
+            return regs.es;
+        case FS:
+            return regs.fs;
+        case GS:
+            return regs.gs;
+        default:
+            throw std::runtime_error("Failed to get register ref");
+    }
+}
+
+uint64_t Tracee::read_register(Register reg, int size) {
+    struct user_regs_struct regs;
+    if (ptrace(PTRACE_GETREGS, child_pid, nullptr, &regs) == -1) {
+        perror("ptrace(PTRACE_GETREGS)");
+        throw std::runtime_error("Failed to get registers");
+    }
+    unsigned long long& value = get_register_ref(regs, reg);
+
+    switch (size) {  // size is in bytes
+        case 1:      // 1 byte
+            return value & 0xFF;
+        case 2:  // 2 bytes
+            return value & 0xFFFF;
+        case 4:  // 4 bytes
+            return value & 0xFFFFFFFF;
+        case 8:  // 8 bytes (full register)
+            return value;
+        default:
+            throw std::runtime_error("Unsupported register size");
+    }
+}
+
+void Tracee::write_register(Register reg, int size, uint64_t value) {
+    struct user_regs_struct regs;
+    if (ptrace(PTRACE_GETREGS, child_pid, nullptr, &regs) == -1) {
+        perror("ptrace(PTRACE_GETREGS)");
+        throw std::runtime_error("Failed to get registers");
+    }
+
+    unsigned long long& full_register = get_register_ref(regs, reg);
+
+    switch (size) {  // size is in bytes
+        case 1:      // 1 byte
+            full_register = (full_register & ~0xFF) | (value & 0xFF);
+            break;
+        case 2:  // 2 bytes
+            full_register = (full_register & ~0xFFFF) | (value & 0xFFFF);
+            break;
+        case 4:  // 4 bytes
+            full_register = (full_register & ~0xFFFFFFFF) | (value & 0xFFFFFFFF);
+            break;
+        case 8:  // 8 bytes (full register)
+            full_register = value;
+            break;
+        default:
+            throw std::runtime_error("Unsupported register size");
+    }
+
+    if (ptrace(PTRACE_SETREGS, child_pid, nullptr, &regs) == -1) {
+        perror("ptrace(PTRACE_SETREGS)");
+        throw std::runtime_error("Failed to set registers");
+    }
+}
+
+std::pair<uint64_t, uint64_t> Tracee::get_stackframe(uint64_t bp) {  // will only go up one layer
+    uint64_t next_bp = 0;
+    uint64_t return_address = 0;
+    read_memory(bp, &next_bp, 8);
+    read_memory(bp + 8, &return_address, 8);
+
+    return {return_address, next_bp};
+}
+
+std::vector<int64_t> Tracee::backtrace() {
+    std::vector<int64_t> addresses;
+    uint64_t bp = read_register(Register::RBP, 8);
+
+    while (true) {
+        auto [return_address, next_bp] = get_stackframe(bp);
+        unsigned long long addr = ptrace(PTRACE_PEEKDATA, child_pid, next_bp, nullptr);
+        if (addr == (unsigned long long)-1) {
+            break;
+        } else {
+            addresses.push_back(return_address);
+            bp = next_bp;
+        }
+    }
+    return addresses;
 }
