@@ -233,21 +233,41 @@ int Operation::execute_command(std::vector<std::string> arguments) {
     }
     else
     {
-        std::cout <<    "Available commands:\n" << 
-                        "bt/backtrace\n" <<
+        std::cout << 
+                        "Available commands:\n" <<
+                        "\n" <<
+
+                        "Breakpoints:\n" << 
                         "b/brk/break/breakpoint 0xHEXADDR\n" <<
                         "b/brk/break/breakpoint SYMBOL\n" <<
-                        "c/continue\n" <<
+                        "\n" <<
+
+                        "Disassemble:\n" << 
                         "d/disas 0xHEXADDR LINENUMS\n" <<
                         "d/disas SYMBOL LINENUMS\n" <<
-                        "si/stepin\n" << 
-                        "rr/readreg REG\n" <<
-                        "wr/writereg REG DATA\n" <<
-                        "i/inj/inject SYSCALL_NUM RDI RSI RDX R10 R8 R9\n" <<
+                        "bt/backtrace\n" <<
+                        "\n" <<
+
+                        "Memory:\n" <<
                         "x/readmem 0xHEXADDR SIZE\n" <<
                         "x/readmem SYMBOL SIZE\n" <<
                         "set/writemem 0xHEXADDR SIZE DATA\n" <<
-                        "set/writemem SYMBOL SIZE DATA\n";
+                        "set/writemem SYMBOL SIZE DATA\n" <<
+                        "\n" <<
+
+                        "Registers:\n" <<
+                        "rr/readreg REG\n" <<
+                        "wr/writereg REG DATA\n" <<
+                        "\n" <<
+
+                        "Continued execution:\n" <<
+                        "c/continue\n" <<
+                        "si/stepin\n" << 
+                        "\n" <<
+
+                        "Syscall injection:\n" <<
+                        "i/inj/inject SYSCALL_NUM RDI RSI RDX R10 R8 R9\n"
+                        ;
         return 0;
     }
 }
