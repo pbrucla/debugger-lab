@@ -231,6 +231,11 @@ int Operation::execute_command(std::vector<std::string> arguments) {
         std::cout << "Written\n";
         return 0;
     }
+    else if (command == "exit" || command == "quit")
+    {
+        tracee->kill_process();
+        exit(0);
+    }
     else
     {
         std::cout << 
@@ -266,7 +271,11 @@ int Operation::execute_command(std::vector<std::string> arguments) {
                         "\n" <<
 
                         "Syscall injection:\n" <<
-                        "i/inj/inject SYSCALL_NUM RDI RSI RDX R10 R8 R9\n"
+                        "i/inj/inject SYSCALL_NUM RDI RSI RDX R10 R8 R9\n" <<
+                        "\n" <<
+
+                        "Exit debugger\n" <<
+                        "exit/quit\n"
                         ;
         return 0;
     }
