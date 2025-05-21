@@ -12,6 +12,7 @@
 #include <unistd.h>
 
 #include <array>
+#include <iomanip>
 #include <iostream>
 #include <unordered_map>
 #include <unordered_set>
@@ -202,6 +203,55 @@ int Tracee::wait_process_exit() {
     }
 }
 
+int Tracee::disassemble(int lineNumber, size_t address) {
+    csh handle;
+    cs_open(CS_ARCH_X86, CS_MODE_64, &handle);
+    cs_insn* insn = cs_malloc(handle);
+    uint8_t code[16];
+    std::vector<cs_insn*> disassembledInstructions;
+    // Read only a few instructions at a time, take the first one, move to the address at the beginning of the next
+    // instruction
+
+    int i = 0;
+    while (i < lineNumber) {
+        read_memory(reinterpret_cast<size_t>(address), &code, 16);
+
+        size_t count = cs_disasm(handle, code, 16, address, 1, &insn);
+        if (count > 0) {
+            // Move to the next instruction
+
+            cs_insn* copy = (cs_insn*)malloc(sizeof(cs_insn));
+            memcpy(copy, &insn[0], sizeof(cs_insn));
+            disassembledInstructions.push_back(copy);
+
+            address += insn[0].size;
+            cs_free(insn, count);
+
+        } else {
+            std::cerr << "disassemble: Could not disassemble instruction " << i + 1 << std::endl;
+            cs_close(&handle);
+            return -1;
+        }
+        i++;
+    }
+    cs_close(&handle);
+
+    if (disassembledInstructions.empty()) {
+        std::cerr << "disassemble: No instructions to print" << std::endl;
+        return -1;
+    }
+    ulong base_address = disassembledInstructions[0]->address;
+    for (auto instr : disassembledInstructions) {
+        std::cout << std::hex << instr->address << " <+" << instr->address - base_address << ">:\t" << instr->mnemonic
+                  << "\t" << instr->op_str << std::endl;
+    }
+
+    for (cs_insn* i : disassembledInstructions) {
+        free(i);
+    }
+    return 0;
+}
+
 unsigned long Tracee::syscall(const unsigned long syscall, const std::array<unsigned long, 6>& args) {
     // read registers
     struct user_regs_struct regs;
@@ -241,6 +291,7 @@ unsigned long Tracee::syscall(const unsigned long syscall, const std::array<unsi
 
     return rv;
 }
+
 unsigned long long& get_register_ref(user_regs_struct& regs, Register reg) {
     switch (reg) {
         case R15:
