@@ -156,15 +156,31 @@ int Operation::execute_command(std::vector<std::string> arguments) {
         }
         std::cout << "End backtrace\n";
         return 0;
-    } else if (command == "si" || command == "stepin") {
+    } 
+
+    else if (command == "d" || command == "disas")
+    {
+        std::string arg1 = arguments.at(1);
+        long arg1_l = Operation::get_addr(arg1);
+
+        int arg2_i = std::stoi(arguments.at(2));
+        return tracee->disassemble(arg2_i, arg1_l);
+    }
+
+    else if (command == "si" || command == "stepin") 
+    {
         std::cout << "Stepping into child\n";
         tracee->step_into();
         return 0;
-    } else if (command == "rr" || command == "readreg") {
+    } 
+    else if (command == "rr" || command == "readreg") 
+    {
         Register arg1 = get_register(arguments.at(1));
         printf("%#lx", tracee->read_register(arg1, 8));
         return 0;
-    } else if (command == "wr" || command == "writereg") {
+    } 
+    else if (command == "wr" || command == "writereg") 
+    {
         Register arg1 = get_register(arguments.at(1));
         unsigned long arg2 = std::stoul(arguments.at(2));
         tracee->write_register(arg1, 8, arg2);
@@ -203,7 +219,8 @@ int Operation::execute_command(std::vector<std::string> arguments) {
         tracee->read_memory(arg1_l, &output, arg2_l);
         printf("%#lx", output);
         return 0;
-    } else if (command == "set" || command == "writemem") {
+    } 
+    else if (command == "set" || command == "writemem") {
         std::string arg1 = arguments.at(1);
         long arg1_l = Operation::get_addr(arg1);
         long arg2_l = std::stoul(arguments.at(2));
@@ -221,6 +238,8 @@ int Operation::execute_command(std::vector<std::string> arguments) {
                         "b/brk/break/breakpoint 0xHEXADDR\n" <<
                         "b/brk/break/breakpoint SYMBOL\n" <<
                         "c/continue\n" <<
+                        "d/disas 0xHEXADDR LINENUMS\n" <<
+                        "d/disas SYMBOL LINENUMS\n" <<
                         "si/stepin\n" << 
                         "rr/readreg REG\n" <<
                         "wr/writereg REG DATA\n" <<
