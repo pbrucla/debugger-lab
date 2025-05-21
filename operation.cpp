@@ -145,33 +145,73 @@ int Operation::execute_command(std::vector<std::string> arguments) {
         std::cout << "Breakpoint added at" << arg1_l << "\n";
         return 0;
 
-    } else if (command == "bt" || command == "backtrace") {
-        std::vector<long> result = tracee->backtrace();
+    }
+    else if (command == "bt" || command == "backtrace")
+    {
+        std::vector<int64_t> result = tracee->backtrace();
+        
         std::cout << "Backtrace:\n";
         for (unsigned long i = 0; i < result.size(); i++) {
             std::cout << result.at(i) << "\n";
         }
         std::cout << "End backtrace\n";
         return 0;
-    } else if (command == "si" || command == "stepin") {
+    } 
+
+    else if (command == "d" || command == "disas")
+    {
+        std::string arg1 = arguments.at(1);
+        long arg1_l = Operation::get_addr(arg1);
+
+        int arg2_i = std::stoi(arguments.at(2));
+        return tracee->disassemble(arg2_i, arg1_l);
+    }
+
+    else if (command == "si" || command == "stepin") 
+    {
         std::cout << "Stepping into child\n";
         tracee->step_into();
         return 0;
-    } else if (command == "rr" || command == "readreg") {
+    } 
+    else if (command == "rr" || command == "readreg") 
+    {
         Register arg1 = get_register(arguments.at(1));
         printf("%#lx", tracee->read_register(arg1, 8));
         return 0;
-    } else if (command == "wr" || command == "writereg") {
+    } 
+    else if (command == "wr" || command == "writereg") 
+    {
         Register arg1 = get_register(arguments.at(1));
-        int arg2 = stoi(arguments.at(2));
-        unsigned long arg3 = std::stoul(arguments.at(3));
-        tracee->write_register(arg1, arg2, arg3);
+        unsigned long arg2 = std::stoul(arguments.at(2));
+        tracee->write_register(arg1, 8, arg2);
         printf("Written\n");
         return 0;
-    } else if (command == "i" || command == "inj" || command == "inject") {
+    }
+    else if (command == "i" || command == "inj" || command == "inject")
+    {
+        // i/inj/inject SYSCALL_NUM VALUE
+        // the user must provide all 6 syscall arguments
+        unsigned long syscall_num = std::stoul(arguments.at(1));
+
+        std::array<unsigned long, 6> syscall_args;
+
+        if (arguments.size() < 8) // not enough args
+        {
+            std::cout << "You don't have enough arguments. Provide a syscall value and 6 arguments.\n For more, hit ENTER.\n";
+            return -1; 
+        }
+
+        for (int i = 0; i < 6; i++)
+        {
+            syscall_args[i] = std::stoul(arguments[i + 2]);
+        }
+
+        unsigned long retval = tracee->syscall(syscall_num, syscall_args);
+        printf("Syscall return: %#lx", retval);
         return 0;
-        // TODO
-    } else if (command == "x" || command == "readmem") {
+    }
+    else if (command == "x" || command == "readmem")
+    {
         std::string arg1 = arguments.at(1);
         long arg1_l = Operation::get_addr(arg1);
         long arg2_l = std::stoul(arguments.at(2));
@@ -179,7 +219,8 @@ int Operation::execute_command(std::vector<std::string> arguments) {
         tracee->read_memory(arg1_l, &output, arg2_l);
         printf("%#lx", output);
         return 0;
-    } else if (command == "set" || command == "writemem") {
+    } 
+    else if (command == "set" || command == "writemem") {
         std::string arg1 = arguments.at(1);
         long arg1_l = Operation::get_addr(arg1);
         long arg2_l = std::stoul(arguments.at(2));
@@ -189,19 +230,53 @@ int Operation::execute_command(std::vector<std::string> arguments) {
 
         std::cout << "Written\n";
         return 0;
-    } else {
-        std::cout << "Available commands:\n"
-                  << "bt/backtrace\n"
-                  << "b/brk/break/breakpoint *0xHEXADDR\n"
-                  << "b/brk/break/breakpoint SYMBOL\n"
-                  << "c/continue\n"
-                  << "si/stepin\n"
-                  << "rr/readreg REG\n"
-                  << "wr/writereg REG NBYTES VALUE\n"
-                  << "i/inj/inject ___" << "x/readmem *0xHEXADDR SIZE\n"
-                  << "x/readmem SYMBOL SIZE\n"
-                  << "set/writemem *0xHEXADDR SIZE VALUE\n"
-                  << "set/writemem SYMBOL SIZE VALUE\n";
+    }
+    else if (command == "exit" || command == "quit")
+    {
+        tracee->kill_process();
+        exit(0);
+    }
+    else
+    {
+        std::cout << 
+                        "Available commands:\n" <<
+                        "\n" <<
+
+                        "Breakpoints:\n" << 
+                        "b/brk/break/breakpoint 0xHEXADDR\n" <<
+                        "b/brk/break/breakpoint SYMBOL\n" <<
+                        "\n" <<
+
+                        "Disassemble:\n" << 
+                        "d/disas 0xHEXADDR LINENUMS\n" <<
+                        "d/disas SYMBOL LINENUMS\n" <<
+                        "bt/backtrace\n" <<
+                        "\n" <<
+
+                        "Memory:\n" <<
+                        "x/readmem 0xHEXADDR SIZE\n" <<
+                        "x/readmem SYMBOL SIZE\n" <<
+                        "set/writemem 0xHEXADDR SIZE DATA\n" <<
+                        "set/writemem SYMBOL SIZE DATA\n" <<
+                        "\n" <<
+
+                        "Registers:\n" <<
+                        "rr/readreg REG\n" <<
+                        "wr/writereg REG DATA\n" <<
+                        "\n" <<
+
+                        "Continued execution:\n" <<
+                        "c/continue\n" <<
+                        "si/stepin\n" << 
+                        "\n" <<
+
+                        "Syscall injection:\n" <<
+                        "i/inj/inject SYSCALL_NUM RDI RSI RDX R10 R8 R9\n" <<
+                        "\n" <<
+
+                        "Exit debugger\n" <<
+                        "exit/quit\n"
+                        ;
         return 0;
     }
 }
@@ -218,7 +293,21 @@ int Operation::parse_and_run() {
             try {
                 execute_command(command);
                 std::cout << "\n";
-            } catch (...) {
+            }
+            catch(int errorcode)
+            {
+                std::cout << "Something went wrong. Reevaluate your commands, and try again.\nFor help, hit ENTER.\n" <<
+                "Errorno thrown: " << errorcode << "\n";
+            }
+            catch(std::runtime_error& error)
+            {
+                std::cout << "Something went wrong. Reevaluate your commands, and try again.\nFor help, hit ENTER.\n";
+                const char* errordesc = error.what();
+                printf("Error description: %s\n", errordesc);
+
+            }
+            catch(...)
+            {
                 std::cout << "Something went wrong. Reevaluate your commands, and try again.\nFor help, hit ENTER.\n";
             }
         }
