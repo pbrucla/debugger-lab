@@ -35,6 +35,7 @@ int main(int argc, char* argv[], char* envp[]) {
         proc.spawn_process(progname, args.data(), envp);
         while (true) {
             op.parse_and_run();
+            proc.continue_process();
         }
     } catch (const std::system_error& e) {
         std::cerr << "Got error: " << e.what() << '\n';

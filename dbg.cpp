@@ -417,7 +417,7 @@ std::pair<uint64_t, uint64_t> Tracee::get_stackframe(uint64_t bp) {  // will onl
 }
 
 std::vector<int64_t> Tracee::backtrace() {
-    std::vector<int64_t> addresses;
+    std::vector<int64_t> addresses{read_register(Register::RIP, 8)};
     uint64_t bp = read_register(Register::RBP, 8);
 
     while (true) {

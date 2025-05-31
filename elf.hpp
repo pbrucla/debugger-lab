@@ -13,6 +13,7 @@ class ELF {
     ~ELF();
     void set_base(uint64_t base) { m_base = base; }
     std::optional<uint64_t> lookup_sym(std::string_view name) const;
+    std::optional<std::string_view> lookup_addr(uint64_t addr) const;
 
    private:
     Elf64_Shdr* find_section(const char* name) const;

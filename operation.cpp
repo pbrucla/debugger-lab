@@ -8,6 +8,7 @@
 #include <optional>
 #include <string>
 #include <vector>
+#include <stdint.h>
 
 #include "dbg.hpp"
 #include "elf.hpp"
@@ -142,16 +143,22 @@ int Operation::execute_command(std::vector<std::string> arguments) {
         }
 
         tracee->insert_breakpoint(arg1_l);  // set breakpoint
-        std::cout << "Breakpoint added at" << arg1_l << "\n";
+        std::cout << "Breakpoint added at 0x" << std::hex << arg1_l << std::dec << '\n';
         return 0;
 
     } else if (command == "bt" || command == "backtrace") {
         std::vector<long> result = tracee->backtrace();
         std::cout << "Backtrace:\n";
         for (unsigned long i = 0; i < result.size(); i++) {
-            std::cout << result.at(i) << "\n";
+            auto addr = result.at(i);
+            auto name = elf->lookup_addr(addr);
+            
+            std::cout << "#" << i << ": 0x" << std::hex << result.at(i) << std::dec;
+            if (name.has_value()) {
+                std::cout << " (" << *name << ")";
+            }
+            std::cout << '\n';
         }
-        std::cout << "End backtrace\n";
         return 0;
     } else if (command == "si" || command == "stepin") {
         std::cout << "Stepping into child\n";
@@ -159,7 +166,7 @@ int Operation::execute_command(std::vector<std::string> arguments) {
         return 0;
     } else if (command == "rr" || command == "readreg") {
         Register arg1 = get_register(arguments.at(1));
-        printf("%#lx", tracee->read_register(arg1, 8));
+        printf("%#lx\n", tracee->read_register(arg1, 8));
         return 0;
     } else if (command == "wr" || command == "writereg") {
         Register arg1 = get_register(arguments.at(1));
@@ -177,7 +184,7 @@ int Operation::execute_command(std::vector<std::string> arguments) {
         long arg2_l = std::stoul(arguments.at(2));
         unsigned long output;
         tracee->read_memory(arg1_l, &output, arg2_l);
-        printf("%#lx", output);
+        printf("%#lx\n", output);
         return 0;
     } else if (command == "set" || command == "writemem") {
         std::string arg1 = arguments.at(1);
@@ -213,13 +220,13 @@ int Operation::parse_and_run() {
         if (command.at(0) == "c" || command.at(0) == "continue")  // break things off if we want to continue
         {
             break;
-        } else  // the user wants to do something
-        {
+        } else {
+            // the user wants to do something
             try {
                 execute_command(command);
-                std::cout << "\n";
-            } catch (...) {
-                std::cout << "Something went wrong. Reevaluate your commands, and try again.\nFor help, hit ENTER.\n";
+            } catch (const std::exception& e) {
+                std::cout << "Something went wrong: " << e.what()
+                          << "\nReevaluate your commands, and try again.\nFor help, hit ENTER.\n";
             }
         }
     }
