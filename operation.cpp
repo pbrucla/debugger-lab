@@ -1,29 +1,20 @@
 #include "operation.hpp"
 
+#include <ctype.h>
 #include <readline/history.h>
 #include <readline/readline.h>  // if you have issues, consider installing readline-dev or readline-devel
+#include <stdint.h>
+#include <stdio.h>
 
-#include <cstdio>
 #include <iostream>
 #include <optional>
 #include <string>
 #include <vector>
-#include <stdint.h>
 
 #include "dbg.hpp"
 #include "elf.hpp"
 
-Operation::Operation(Tracee& tracee_arg, ELF& elf_arg) {
-    tracee = &tracee_arg;
-    elf = &elf_arg;
-}
-
-Operation::Operation(Tracee& tracee_arg) {
-    tracee = &tracee_arg;
-    std::cout << "No ELF parsing will occur in this session. Refrain from using symbols in arguments.\n";
-}
-
-Register Operation::get_register(std::string input) {
+std::optional<Register> Operation::get_register(std::string input) {
     if (input == "r15" || input == "R15")
         return R15;
     else if (input == "r14" || input == "R14")
@@ -79,27 +70,21 @@ Register Operation::get_register(std::string input) {
     else if (input == "gs_base" || input == "GS_BASE")
         return GS_BASE;
     else {
-        perror("No valid register provided. Try again.\n");
-        throw -1;
+        printf("Invalid register `%s`\n", input.c_str());
+        return {};
     }
 }
 
-long Operation::get_addr(std::string arg) {
-    if (isdigit(arg[0]))  // address
-    {
-        return std::stoul(arg, NULL, 16);  // drop the asterisk, convert to unsigned long
-    } else                                 // symbol
-    {
-        if (elf == NULL) {
-            return -2;
-        }
-
-        std::optional<long> arg_ul = elf->lookup_sym(arg);
-        if (arg_ul.has_value()) {
-            return arg_ul.value();
-        } else
-            return -1;
+std::optional<uint64_t> Operation::get_addr(std::string arg) {
+    if (isdigit(arg[0])) {
+        return std::stoul(arg, nullptr, 16);
     }
+    auto addr = m_tracee.elf().lookup_sym(arg);
+    if (addr) {
+        return addr.value();
+    }
+    printf("Undefined symbol `%s`\n", arg.c_str());
+    return {};
 }
 
 std::vector<std::string> Operation::get_tokenize_command() {
@@ -126,76 +111,68 @@ std::vector<std::string> Operation::get_tokenize_command() {
     return command_arguments;
 }
 
-int Operation::execute_command(std::vector<std::string> arguments) {
+void Operation::execute_command(const std::vector<std::string>& arguments) {
     std::string command = arguments.at(0);
 
     if (command == "b" || command == "brk" || command == "break" || command == "breakpoint") {
-        std::string arg1 = arguments.at(1);
-        long arg1_l = Operation::get_addr(arg1);
-        // determine if we are working with an address or symbol
-
-        if (arg1_l == -1) {
-            std::cout << "This appears to be an invalid symbol. Try again.\n";
-            return -1;
-        } else if (arg1_l == -2) {
-            std::cout << "Symbols are not supported at this time. Use addresses for the time being.\n";
-            return -1;
+        auto addr = get_addr(arguments.at(1));
+        if (addr) {
+            m_tracee.insert_breakpoint(addr.value());
+            printf("Breakpoint added at %#lx\n", addr.value());
         }
-
-        tracee->insert_breakpoint(arg1_l);  // set breakpoint
-        std::cout << "Breakpoint added at 0x" << std::hex << arg1_l << std::dec << '\n';
-        return 0;
-
     } else if (command == "bt" || command == "backtrace") {
-        std::vector<long> result = tracee->backtrace();
+        std::vector<long> result = m_tracee.backtrace();
         std::cout << "Backtrace:\n";
         for (unsigned long i = 0; i < result.size(); i++) {
             auto addr = result.at(i);
-            auto name = elf->lookup_addr(addr);
-            
+            auto name = m_tracee.elf().lookup_addr(addr);
+
             std::cout << "#" << i << ": 0x" << std::hex << result.at(i) << std::dec;
             if (name.has_value()) {
                 std::cout << " (" << *name << ")";
             }
             std::cout << '\n';
         }
-        return 0;
     } else if (command == "si" || command == "stepin") {
         std::cout << "Stepping into child\n";
-        tracee->step_into();
-        return 0;
+        m_tracee.step_into();
     } else if (command == "rr" || command == "readreg") {
-        Register arg1 = get_register(arguments.at(1));
-        printf("%#lx\n", tracee->read_register(arg1, 8));
-        return 0;
+        auto reg_name = arguments.at(1);
+        auto reg = get_register(reg_name);
+        if (reg) {
+            printf("%s = %#lx\n", reg_name.c_str(), m_tracee.read_register(reg.value(), 8));
+        }
     } else if (command == "wr" || command == "writereg") {
-        Register arg1 = get_register(arguments.at(1));
-        int arg2 = stoi(arguments.at(2));
-        unsigned long arg3 = std::stoul(arguments.at(3));
-        tracee->write_register(arg1, arg2, arg3);
-        printf("Written\n");
-        return 0;
+        auto reg_name = arguments.at(1);
+        auto reg = get_register(reg_name);
+        auto width = std::stoi(arguments.at(2));
+        auto value = std::stoul(arguments.at(3));
+        if (reg) {
+            m_tracee.write_register(reg.value(), width, value);
+            printf("Written to %s\n", reg_name.c_str());
+        }
     } else if (command == "i" || command == "inj" || command == "inject") {
-        return 0;
         // TODO
     } else if (command == "x" || command == "readmem") {
-        std::string arg1 = arguments.at(1);
-        long arg1_l = Operation::get_addr(arg1);
-        long arg2_l = std::stoul(arguments.at(2));
-        unsigned long output;
-        tracee->read_memory(arg1_l, &output, arg2_l);
-        printf("%#lx\n", output);
-        return 0;
+        auto addr = get_addr(arguments.at(1));
+        auto size = std::stoul(arguments.at(2));
+        if (addr) {
+            unsigned long output;
+            m_tracee.read_memory(addr.value(), &output, size);
+            printf("%#lx: %#lx\n", addr.value(), output);
+        }
     } else if (command == "set" || command == "writemem") {
-        std::string arg1 = arguments.at(1);
-        long arg1_l = Operation::get_addr(arg1);
-        long arg2_l = std::stoul(arguments.at(2));
-        long arg3_l = std::stoul(arguments.at(3));
+        auto addr = get_addr(arguments.at(1));
+        auto size = std::stoul(arguments.at(2));
+        auto value = std::stoul(arguments.at(3));
 
-        tracee->write_memory(arg1_l, &arg3_l, arg2_l);
-
-        std::cout << "Written\n";
-        return 0;
+        if (addr) {
+            m_tracee.write_memory(addr.value(), &value, size);
+            printf("Written to %#lx\n", addr.value());
+        }
+    } else if (command == "c" || command == "continue") {
+        puts("Continuing");
+        m_tracee.continue_process();
     } else {
         std::cout << "Available commands:\n"
                   << "bt/backtrace\n"
@@ -210,27 +187,10 @@ int Operation::execute_command(std::vector<std::string> arguments) {
                   << "x/readmem SYMBOL SIZE\n"
                   << "set/writemem *0xHEXADDR SIZE VALUE\n"
                   << "set/writemem SYMBOL SIZE VALUE\n";
-        return 0;
     }
 }
 
-int Operation::parse_and_run() {
-    while (true) {
-        std::vector<std::string> command = get_tokenize_command();
-
-        if (command.at(0) == "c" || command.at(0) == "continue")  // break things off if we want to continue
-        {
-            break;
-        } else {
-            // the user wants to do something
-            try {
-                execute_command(command);
-            } catch (const std::exception& e) {
-                std::cout << "Something went wrong: " << e.what()
-                          << "\nReevaluate your commands, and try again.\nFor help, hit ENTER.\n";
-            }
-        }
-    }
-    std::cout << "Continuing\n";
-    return 0;
+void Operation::parse_and_run() {
+    auto command = get_tokenize_command();
+    execute_command(command);
 }

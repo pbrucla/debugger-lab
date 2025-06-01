@@ -29,7 +29,7 @@ std::optional<uint64_t> ELF::lookup_sym(std::string_view name) const {
 std::optional<std::string_view> ELF::lookup_addr(uint64_t addr) const {
     std::optional<std::string_view> ret;
     std::optional<uint64_t> ret_addr;
-    for (const auto& [sym, sym_addr]: m_syms) {
+    for (const auto& [sym, sym_addr] : m_syms) {
         if (addr >= sym_addr && sym_addr >= ret_addr.value_or(0)) {
             ret = sym;
             ret_addr = sym_addr;
