@@ -1,9 +1,9 @@
 #include "operation.hpp"
 
-#include <cstdio>
 #include <readline/history.h>
 #include <readline/readline.h>  // if you have issues, consider installing readline-dev or readline-devel
 
+#include <cstdio>
 #include <iostream>
 #include <optional>
 #include <string>
@@ -205,7 +205,8 @@ int Operation::execute_command(std::vector<std::string> arguments) {
                   << "si/stepin\n"
                   << "rr/readreg REG\n"
                   << "wr/writereg REG NBYTES VALUE\n"
-                  << "i/inj/inject ___" << "x/readmem *0xHEXADDR SIZE\n"
+                  << "i/inj/inject ___"
+                  << "x/readmem *0xHEXADDR SIZE\n"
                   << "x/readmem SYMBOL SIZE\n"
                   << "set/writemem *0xHEXADDR SIZE VALUE\n"
                   << "set/writemem SYMBOL SIZE VALUE\n";
