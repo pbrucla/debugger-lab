@@ -27,6 +27,7 @@ std::optional<uint64_t> ELF::lookup_sym(std::string_view name) const {
 }
 
 std::optional<std::string_view> ELF::lookup_addr(uint64_t addr) const {
+    addr -= m_base;
     std::optional<std::string_view> ret;
     std::optional<uint64_t> ret_addr;
     for (const auto& [sym, sym_addr] : m_syms) {
@@ -59,6 +60,7 @@ void ELF::parse(const char* filename) {
     util::throw_assert(m_file != MAP_FAILED, "mmap failed");
     auto* ehdr = reinterpret_cast<Elf64_Ehdr*>(m_file);
     m_shnum = ehdr->e_shnum;
+    m_entry = ehdr->e_entry;
 
     util::throw_assert(memcmp(ehdr->e_ident, ELFMAG, SELFMAG) == 0, "not an ELF file");
     util::throw_assert(ehdr->e_machine == EM_X86_64, "unsupported machine");

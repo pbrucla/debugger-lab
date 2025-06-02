@@ -11,7 +11,8 @@ class ELF {
    public:
     explicit ELF(const char* filename);
     ~ELF();
-    void set_base(uint64_t base) { m_base = base; }
+    uint64_t base() const { return m_base; }
+    void set_base(uint64_t entry) { m_base = entry - m_entry; }
     std::optional<uint64_t> lookup_sym(std::string_view name) const;
     std::optional<std::string_view> lookup_addr(uint64_t addr) const;
 
@@ -25,5 +26,6 @@ class ELF {
     size_t m_shnum;
     Elf64_Shdr* m_shdrs;
     const char* m_shstrtab;
+    uint64_t m_entry;
     std::unordered_map<std::string_view, uint64_t> m_syms;
 };

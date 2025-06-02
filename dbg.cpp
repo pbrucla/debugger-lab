@@ -1,7 +1,9 @@
 #include "dbg.hpp"
 
 #include <capstone/capstone.h>
+#include <elf.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <signal.h>
 #include <stdint.h>
 #include <string.h>
@@ -16,6 +18,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "elf.hpp"
 #include "util.hpp"
 
 using word = unsigned long;
@@ -124,9 +127,30 @@ void Tracee::spawn_process(char* const argv[], char* const envp[]) {
         int status;
         util::throw_errno(waitpid(m_child_pid, &status, 0));
         util::throw_assert(WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP);
-        for (auto& p : m_breakpoints) {
-            inject_breakpoint(p.second);
+        char auxv_path[256];
+        snprintf(auxv_path, sizeof(auxv_path), "/proc/%d/auxv", m_child_pid);
+        int auxv_fd = util::throw_errno(open(auxv_path, O_RDONLY));
+        Elf64_auxv_t auxv;
+        for (;;) {
+            auto n = read(auxv_fd, &auxv, sizeof(auxv));
+            util::throw_assert(n == sizeof(auxv));
+            if (auxv.a_type == AT_NULL) {
+                break;
+            }
+            m_auxv.emplace(auxv.a_type, auxv.a_un.a_val);
         }
+        close(auxv_fd);
+        m_elf.set_base(m_auxv.at(AT_ENTRY));
+        if (m_elf.base() != 0) {
+            printf("PIE executable (base %#lx)\n", m_elf.base());
+        }
+        std::unordered_map<size_t, Breakpoint> new_breakpoints;
+        for (auto& [addr, bp] : m_breakpoints) {
+            bp.addr += m_elf.base();
+            inject_breakpoint(bp);
+            new_breakpoints.emplace(m_elf.base() + addr, bp);
+        }
+        m_breakpoints = std::move(new_breakpoints);
     }
 }
 
@@ -158,6 +182,7 @@ int Tracee::continue_process() {
         size_t pc = regs.rip;
         if (m_breakpoints.contains(pc)) {
             // we hit a breakpoint
+            printf("Hit breakpoint at %#zx\n", pc);
             m_breakpoint_hit = true;
             uninject_breakpoint(m_breakpoints.at(pc));
             util::throw_errno(ptrace(PTRACE_SETREGS, m_child_pid, nullptr, &regs));

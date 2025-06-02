@@ -92,6 +92,7 @@ class Tracee {
     bool m_breakpoint_hit = false;
     pid_t m_child_pid = NOCHILD;
     std::unordered_map<size_t, Breakpoint> m_breakpoints;
+    std::unordered_map<uint64_t, uint64_t> m_auxv;
     ELF m_elf;
     const char* m_pathname;
 };
