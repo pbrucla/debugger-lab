@@ -1,7 +1,10 @@
 #include "dbg.hpp"
 
-#include <assert.h>
+#include <capstone/capstone.h>
+#include <elf.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <link.h>
 #include <signal.h>
 #include <stdint.h>
 #include <string.h>
@@ -12,22 +15,20 @@
 #include <unistd.h>
 
 #include <array>
-#include <iomanip>
 #include <iostream>
+#include <string>
+#include <string_view>
 #include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
+#include "elf.hpp"
 #include "util.hpp"
 
 using word = unsigned long;
 
-Breakpoint::Breakpoint(size_t addr) : addr(addr), injected(false), orig_byte(0) {}
-
-Tracee::Tracee() {}
 Tracee::~Tracee() {
     try {
-        Tracee::kill_process();
+        kill_process();
     } catch (const std::system_error&) {
     }
 }
@@ -51,27 +52,27 @@ void Tracee::uninject_breakpoint(Breakpoint& bp) {
 }
 
 void Tracee::kill_process(int sgn) {
-    if (child_pid == NOCHILD) {
+    if (m_child_pid == NOCHILD) {
         return;
     }
-    if (kill(child_pid, sgn) < 0 && errno != ESRCH) {
+    if (kill(m_child_pid, sgn) < 0 && errno != ESRCH) {
         util::throw_errno();
     }
 }
 
 void Tracee::step_into() {
-    if (child_pid == NOCHILD) {
+    if (m_child_pid == NOCHILD) {
         std::cerr << "Cannot single step in stopped process\n";
         return;
     }
-    util::throw_errno(ptrace(PTRACE_SINGLESTEP, child_pid, nullptr, nullptr));
+    util::throw_errno(ptrace(PTRACE_SINGLESTEP, m_child_pid, nullptr, nullptr));
     int status;
-    util::throw_errno(waitpid(child_pid, &status, 0));
-    assert(WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP);
+    util::throw_errno(waitpid(m_child_pid, &status, 0));
+    util::throw_assert(WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP);
 }
 
 void Tracee::read_memory(size_t addr, void* out, size_t sz) {
-    if (child_pid == NOCHILD) {
+    if (m_child_pid == NOCHILD) {
         std::cerr << "Cannot read memory in stopped process\n";
         return;
     }
@@ -80,9 +81,9 @@ void Tracee::read_memory(size_t addr, void* out, size_t sz) {
     for (size_t i = 0; i * sizeof(word) < sz; i++) {
         errno = 0;
         if (sz - i * sizeof(word) >= sizeof(word)) {
-            *out_addr = util::throw_errno(ptrace(PTRACE_PEEKDATA, child_pid, in_addr, nullptr));
+            *out_addr = util::throw_errno(ptrace(PTRACE_PEEKDATA, m_child_pid, in_addr, nullptr));
         } else {
-            word out = util::throw_errno(ptrace(PTRACE_PEEKDATA, child_pid, in_addr, nullptr));
+            word out = util::throw_errno(ptrace(PTRACE_PEEKDATA, m_child_pid, in_addr, nullptr));
             memcpy(out_addr, static_cast<void*>(&out), sz - i * sizeof(word));
         }
         out_addr++;
@@ -91,7 +92,7 @@ void Tracee::read_memory(size_t addr, void* out, size_t sz) {
 }
 
 void Tracee::write_memory(size_t addr, const void* data, size_t sz) {
-    if (child_pid == NOCHILD) {
+    if (m_child_pid == NOCHILD) {
         std::cerr << "Cannot write memory in stopped process\n";
         return;
     }
@@ -99,20 +100,34 @@ void Tracee::write_memory(size_t addr, const void* data, size_t sz) {
     const word* out_addr = reinterpret_cast<const word*>(addr);
     for (size_t i = 0; i * sizeof(word) < sz; i++) {
         if (sz - i * sizeof(word) >= sizeof(word)) {
-            util::throw_errno(ptrace(PTRACE_POKEDATA, child_pid, out_addr, *in_addr));
+            util::throw_errno(ptrace(PTRACE_POKEDATA, m_child_pid, out_addr, *in_addr));
         } else {
             word val;
             read_memory(reinterpret_cast<size_t>(out_addr), &val, sizeof(val));
             memcpy(&val, in_addr, sz - i * sizeof(word));
-            util::throw_errno(ptrace(PTRACE_POKEDATA, child_pid, out_addr, val));
+            util::throw_errno(ptrace(PTRACE_POKEDATA, m_child_pid, out_addr, val));
         }
         out_addr++;
         in_addr++;
     }
 }
 
-void Tracee::spawn_process(const char* pathname, char* const argv[], char* const envp[]) {
-    if (child_pid != NOCHILD) {
+std::string Tracee::read_string(uint64_t addr) {
+    std::string ret;
+    char buf[8];
+    for (;; addr += sizeof(buf)) {
+        read_memory(addr, buf, sizeof(buf));
+        auto* end = static_cast<char*>(memchr(buf, 0, sizeof(buf)));
+        ret.append(buf, end ? end : (buf + sizeof(buf)));
+        if (end) {
+            break;
+        }
+    }
+    return ret;
+}
+
+void Tracee::spawn_process(char* const argv[], char* const envp[]) {
+    if (m_child_pid != NOCHILD) {
         kill_process();
         wait_process_exit();
     }
@@ -122,82 +137,84 @@ void Tracee::spawn_process(const char* pathname, char* const argv[], char* const
         int persona = personality(0xffffffffULL);
         personality(persona | ADDR_NO_RANDOMIZE);
         util::throw_errno(ptrace(PTRACE_TRACEME, 0, nullptr, nullptr));
-        util::throw_errno(execve(pathname, argv, envp));
+        util::throw_errno(execve(m_pathname, argv, envp));
     } else {
         // parent
-        child_pid = pid;
+        m_child_pid = pid;
         int status;
-        util::throw_errno(waitpid(child_pid, &status, 0));
-        assert(WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP);
-        for (auto& p : breakpoints) {
-            inject_breakpoint(p.second);
-        }
+        util::throw_errno(waitpid(m_child_pid, &status, 0));
+        util::throw_assert(WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP);
+        post_spawn();
     }
 }
 
 int Tracee::continue_process() {
-    if (child_pid == NOCHILD) {
+    if (m_child_pid == NOCHILD) {
         std::cerr << "Cannot continue stopped process\n";
         return 0;
     }
 
     int status;
-    if (breakpoint_hit) {
+    if (m_breakpoint_hit) {
         struct user_regs_struct regs;
-        util::throw_errno(ptrace(PTRACE_GETREGS, child_pid, nullptr, &regs));
+        util::throw_errno(ptrace(PTRACE_GETREGS, m_child_pid, nullptr, &regs));
         size_t pc = regs.rip;
-        auto it = breakpoints.find(pc);
-        breakpoint_hit = false;
-        if (it != breakpoints.end()) {
+        auto it = m_breakpoints.find(pc);
+        m_breakpoint_hit = false;
+        if (it != m_breakpoints.end()) {
             step_into();
             inject_breakpoint(it->second);
         }
     }
 
-    util::throw_errno(ptrace(PTRACE_CONT, child_pid, NULL, NULL));
-    util::throw_errno(waitpid(child_pid, &status, 0));
+    util::throw_errno(ptrace(PTRACE_CONT, m_child_pid, nullptr, nullptr));
+    util::throw_errno(waitpid(m_child_pid, &status, 0));
     if (WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP) {
         struct user_regs_struct regs;
-        util::throw_errno(ptrace(PTRACE_GETREGS, child_pid, nullptr, &regs));
+        util::throw_errno(ptrace(PTRACE_GETREGS, m_child_pid, nullptr, &regs));
         regs.rip--;
         size_t pc = regs.rip;
-        if (breakpoints.count(pc) > 0) {
+        if (m_breakpoints.contains(pc)) {
             // we hit a breakpoint
-            breakpoint_hit = true;
-            uninject_breakpoint(breakpoints.at(pc));
-            util::throw_errno(ptrace(PTRACE_SETREGS, child_pid, nullptr, &regs));
+            printf("Hit breakpoint at %#zx\n", pc);
+            m_breakpoint_hit = true;
+            uninject_breakpoint(m_breakpoints.at(pc));
+            util::throw_errno(ptrace(PTRACE_SETREGS, m_child_pid, nullptr, &regs));
         }
-    }
-    if (WIFEXITED(status) || WIFSIGNALED(status)) {
-        std::cerr << "process exited\n";
-        child_pid = NOCHILD;
+    } else if (WIFEXITED(status)) {
+        printf("Process exited with code %d\n", WEXITSTATUS(status));
+        m_child_pid = NOCHILD;
+    } else if (WIFSIGNALED(status)) {
+        int sig = WTERMSIG(status);
+        printf("Process received signal %d (%s)\n", sig, strsignal(sig));
+        m_child_pid = NOCHILD;
     }
     return status;
 }
 
 void Tracee::insert_breakpoint(size_t addr) {
-    if (breakpoints.count(addr) > 0) {
+    if (m_breakpoints.contains(addr)) {
         return;
     }
-    auto [it, _] = breakpoints.emplace(addr, addr);
+    auto [it, _] = m_breakpoints.emplace(addr, Breakpoint{.addr = addr});
     Breakpoint& bp = it->second;
-    if (child_pid != NOCHILD) {
+    if (m_child_pid != NOCHILD) {
         inject_breakpoint(bp);
     }
 }
 
 int Tracee::wait_process_exit() {
-    if (child_pid == NOCHILD) {
+    if (m_child_pid == NOCHILD) {
         return 0;
     }
     while (1) {
         int status;
-        util::throw_errno(waitpid(child_pid, &status, 0));
+        util::throw_errno(waitpid(m_child_pid, &status, 0));
         if (WIFEXITED(status)) {
-            child_pid = NOCHILD;
+            m_child_pid = NOCHILD;
             return WEXITSTATUS(status);
         } else if (WIFSIGNALED(status)) {
-            child_pid = NOCHILD;
+            m_child_pid = NOCHILD;
             return WTERMSIG(status);
         }
     }
@@ -255,7 +272,7 @@ int Tracee::disassemble(int lineNumber, size_t address) {
 unsigned long Tracee::syscall(const unsigned long syscall, const std::array<unsigned long, 6>& args) {
     // read registers
     struct user_regs_struct regs;
-    ptrace(PTRACE_GETREGS, child_pid, nullptr, &regs);
+    ptrace(PTRACE_GETREGS, m_child_pid, nullptr, &regs);
 
     // inject syscall & store prev instr at addr
     unsigned long instruction_ptr_addr = regs.rip & ~0xfff;  // idk why im page aligning tbh
@@ -275,19 +292,19 @@ unsigned long Tracee::syscall(const unsigned long syscall, const std::array<unsi
     syscall_regs.r8 = args[4];
     syscall_regs.r9 = args[5];
     syscall_regs.rip = instruction_ptr_addr;
-    util::throw_errno(ptrace(PTRACE_SETREGS, child_pid, nullptr, &syscall_regs));
+    util::throw_errno(ptrace(PTRACE_SETREGS, m_child_pid, nullptr, &syscall_regs));
 
     step_into();  // actually run the syscall
 
     // retrieve return value
     struct user_regs_struct after;
-    ptrace(PTRACE_GETREGS, child_pid, nullptr, &after);
+    ptrace(PTRACE_GETREGS, m_child_pid, nullptr, &after);
     unsigned long rv = after.rax;  // retvals at %rax
 
     write_memory(instruction_ptr_addr, &instruction, 2);  // restore instruction
 
     // set regs back
-    util::throw_errno(ptrace(PTRACE_SETREGS, child_pid, nullptr, &regs));
+    util::throw_errno(ptrace(PTRACE_SETREGS, m_child_pid, nullptr, &regs));
 
     return rv;
 }
@@ -355,10 +372,7 @@ unsigned long long& get_register_ref(user_regs_struct& regs, Register reg) {
 
 uint64_t Tracee::read_register(Register reg, int size) {
     struct user_regs_struct regs;
-    if (ptrace(PTRACE_GETREGS, child_pid, nullptr, &regs) == -1) {
-        perror("ptrace(PTRACE_GETREGS)");
-        throw std::runtime_error("Failed to get registers");
-    }
+    util::throw_errno(ptrace(PTRACE_GETREGS, m_child_pid, nullptr, &regs));
     unsigned long long& value = get_register_ref(regs, reg);
 
     switch (size) {  // size is in bytes
@@ -377,10 +391,7 @@ uint64_t Tracee::read_register(Register reg, int size) {
 
 void Tracee::write_register(Register reg, int size, uint64_t value) {
     struct user_regs_struct regs;
-    if (ptrace(PTRACE_GETREGS, child_pid, nullptr, &regs) == -1) {
-        perror("ptrace(PTRACE_GETREGS)");
-        throw std::runtime_error("Failed to get registers");
-    }
+    util::throw_errno(ptrace(PTRACE_GETREGS, m_child_pid, nullptr, &regs));
 
     unsigned long long& full_register = get_register_ref(regs, reg);
 
@@ -401,10 +412,7 @@ void Tracee::write_register(Register reg, int size, uint64_t value) {
             throw std::runtime_error("Unsupported register size");
     }
 
-    if (ptrace(PTRACE_SETREGS, child_pid, nullptr, &regs) == -1) {
-        perror("ptrace(PTRACE_SETREGS)");
-        throw std::runtime_error("Failed to set registers");
-    }
+    util::throw_errno(ptrace(PTRACE_SETREGS, m_child_pid, nullptr, &regs));
 }
 
 std::pair<uint64_t, uint64_t> Tracee::get_stackframe(uint64_t bp) {  // will only go up one layer
@@ -422,7 +430,7 @@ std::vector<int64_t> Tracee::backtrace() {
 
     while (true) {
         auto [return_address, next_bp] = get_stackframe(bp);
-        unsigned long long addr = ptrace(PTRACE_PEEKDATA, child_pid, next_bp, nullptr);
+        unsigned long long addr = ptrace(PTRACE_PEEKDATA, m_child_pid, next_bp, nullptr);
         if (addr == (unsigned long long)-1) {
             break;
         } else {
@@ -431,4 +439,103 @@ std::vector<int64_t> Tracee::backtrace() {
         }
     }
     return addresses;
+}
+
+std::optional<uint64_t> Tracee::lookup_sym(std::string_view name) const {
+    std::optional<uint64_t> addr;
+    if ((addr = m_elf.lookup_sym(name))) {
+        return addr;
+    }
+    if (m_dl && (addr = m_dl->lookup_sym(name))) {
+        return addr;
+    }
+    for (const auto& shlib : m_shlibs) {
+        if ((addr = shlib.lookup_sym(name))) {
+            return addr;
+        }
+    }
+    return {};
+}
+
+std::optional<std::pair<uint64_t, uint64_t>> Tracee::find_segment(uint32_t type) {
+    auto phdr_addr = m_auxv.at(AT_PHDR);
+    auto phnum = m_auxv.at(AT_PHNUM);
+    auto phent = m_auxv.at(AT_PHENT);
+    util::throw_assert(phent == sizeof(Elf64_Phdr));
+    Elf64_Phdr phdr;
+    for (size_t i = 0; i < phnum; ++i) {
+        read_memory(phdr_addr + i * phent, &phdr, phent);
+        if (phdr.p_type == type) {
+            return {{m_elf.base() + phdr.p_vaddr, phdr.p_memsz}};
+        }
+    }
+    return {};
+}
+
+std::optional<uint64_t> Tracee::find_dynamic_entry(int64_t tag) {
+    auto [dyn_addr, dyn_size] = m_dyn;
+    Elf64_Dyn dyn;
+    for (size_t i = 0; i < dyn_size / sizeof(dyn); ++i) {
+        read_memory(dyn_addr + i * sizeof(dyn), &dyn, sizeof(dyn));
+        if (dyn.d_tag == tag) {
+            return dyn.d_un.d_val;
+        }
+    }
+    return {};
+}
+
+void Tracee::post_spawn() {
+    char auxv_path[256];
+    snprintf(auxv_path, sizeof(auxv_path), "/proc/%d/auxv", m_child_pid);
+    int auxv_fd = util::throw_errno(open(auxv_path, O_RDONLY));
+    Elf64_auxv_t auxv;
+    for (;;) {
+        auto n = read(auxv_fd, &auxv, sizeof(auxv));
+        util::throw_assert(n == sizeof(auxv));
+        if (auxv.a_type == AT_NULL) {
+            break;
+        }
+        m_auxv.emplace(auxv.a_type, auxv.a_un.a_val);
+    }
+    close(auxv_fd);
+    auto entry = m_auxv.at(AT_ENTRY);
+    m_elf.set_base_from_entry(entry);
+    if (m_elf.base() != 0) {
+        printf("PIE executable (base %#lx)\n", m_elf.base());
+
+        std::unordered_map<size_t, Breakpoint> new_breakpoints;
+        for (auto& [addr, bp] : m_breakpoints) {
+            bp.addr += m_elf.base();
+            inject_breakpoint(bp);
+            new_breakpoints.emplace(m_elf.base() + addr, bp);
+        }
+        m_breakpoints = std::move(new_breakpoints);
+    }
+
+    if (auto interp = m_elf.interp()) {
+        m_dl.emplace(interp->data(), m_auxv.at(AT_BASE));
+        printf("Setting temporary breakpoint at entry point (%#lx)\n", entry);
+        insert_breakpoint(entry);
+        continue_process();
+        m_breakpoints.erase(entry);
+
+        m_dyn = *find_segment(PT_DYNAMIC);
+        auto debug_addr = *find_dynamic_entry(DT_DEBUG);
+        r_debug debug;
+        read_memory(debug_addr, &debug, sizeof(debug));
+        link_map lm;
+        for (auto lm_addr = reinterpret_cast<uint64_t>(debug.r_map); lm_addr != 0;
+             lm_addr = reinterpret_cast<uint64_t>(lm.l_next)) {
+            read_memory(lm_addr, &lm, sizeof(lm));
+            if (!lm.l_prev) {
+                continue;
+            }
+            auto name = read_string(reinterpret_cast<uint64_t>(lm.l_name));
+            if (name == *interp || name == "linux-vdso.so.1") {
+                continue;
+            }
+            printf("Adding shared library %s (%#lx)\n", name.c_str(), lm.l_addr);
+            m_shlibs.emplace_back(name.c_str(), lm.l_addr);
+        }
+    }
 }
