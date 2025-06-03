@@ -12,13 +12,39 @@
 #include <optional>
 #include <string_view>
 #include <unordered_map>
+#include <utility>
 
 #include "dwarf.hpp"
 #include "util.hpp"
 
-ELF::ELF(const char* filename) { parse(filename); }
+ELF::ELF(const char* filename, uint64_t base) : m_base(base) { parse(filename); }
 
-ELF::~ELF() { munmap(m_file, m_filesize); }
+ELF& ELF::operator=(ELF&& other) {
+    m_base = other.m_base;
+    m_file = other.m_file;
+    m_filesize = other.m_filesize;
+    m_shnum = other.m_shnum;
+    m_shdrs = other.m_shdrs;
+    m_shstrtab = other.m_shstrtab;
+    m_entry = other.m_entry;
+    m_syms = std::move(other.m_syms);
+    other.m_file = nullptr;
+    return *this;
+}
+
+ELF::~ELF() {
+    if (m_file) {
+        munmap(m_file, m_filesize);
+    }
+}
+
+std::optional<std::string_view> ELF::interp() const {
+    auto* interp_shdr = find_section(".interp");
+    if (!interp_shdr) {
+        return {};
+    }
+    return reinterpret_cast<char*>(m_file + interp_shdr->sh_offset);
+}
 
 std::optional<uint64_t> ELF::lookup_sym(std::string_view name) const {
     auto sym = m_syms.find(name);
@@ -98,17 +124,19 @@ void ELF::parse(const char* filename) {
 
     collect_syms(".symtab", ".strtab");
     collect_syms(".dynsym", ".dynstr");
-    printf("%zu symbols loaded\n", m_syms.size());
+    printf("%zu symbols loaded from %s\n", m_syms.size(), filename);
 
     auto* eh_frame_shdr = find_section(".eh_frame");
     if (!eh_frame_shdr) {
         puts("No .eh_frame section found");
     } else {
+#if 0
         auto* eh_frame = m_file + eh_frame_shdr->sh_offset;
         size_t eh_frame_size = eh_frame_shdr->sh_size;
         const auto* p = eh_frame;
         std::unordered_map<size_t, DWARF::CIE> cie_map;
         while (p < eh_frame + eh_frame_size) DWARF::parse_eh_frame_entry(p, eh_frame, eh_frame_shdr->sh_addr, cie_map);
+#endif
     }
 
     close(fd);

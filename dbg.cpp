@@ -4,6 +4,7 @@
 #include <elf.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <link.h>
 #include <signal.h>
 #include <stdint.h>
 #include <string.h>
@@ -15,6 +16,8 @@
 
 #include <array>
 #include <iostream>
+#include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -109,6 +112,20 @@ void Tracee::write_memory(size_t addr, const void* data, size_t sz) {
     }
 }
 
+std::string Tracee::read_string(uint64_t addr) {
+    std::string ret;
+    char buf[8];
+    for (;; addr += sizeof(buf)) {
+        read_memory(addr, buf, sizeof(buf));
+        auto* end = static_cast<char*>(memchr(buf, 0, sizeof(buf)));
+        ret.append(buf, end ? end : (buf + sizeof(buf)));
+        if (end) {
+            break;
+        }
+    }
+    return ret;
+}
+
 void Tracee::spawn_process(char* const argv[], char* const envp[]) {
     if (m_child_pid != NOCHILD) {
         kill_process();
@@ -127,30 +144,7 @@ void Tracee::spawn_process(char* const argv[], char* const envp[]) {
         int status;
         util::throw_errno(waitpid(m_child_pid, &status, 0));
         util::throw_assert(WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP);
-        char auxv_path[256];
-        snprintf(auxv_path, sizeof(auxv_path), "/proc/%d/auxv", m_child_pid);
-        int auxv_fd = util::throw_errno(open(auxv_path, O_RDONLY));
-        Elf64_auxv_t auxv;
-        for (;;) {
-            auto n = read(auxv_fd, &auxv, sizeof(auxv));
-            util::throw_assert(n == sizeof(auxv));
-            if (auxv.a_type == AT_NULL) {
-                break;
-            }
-            m_auxv.emplace(auxv.a_type, auxv.a_un.a_val);
-        }
-        close(auxv_fd);
-        m_elf.set_base(m_auxv.at(AT_ENTRY));
-        if (m_elf.base() != 0) {
-            printf("PIE executable (base %#lx)\n", m_elf.base());
-        }
-        std::unordered_map<size_t, Breakpoint> new_breakpoints;
-        for (auto& [addr, bp] : m_breakpoints) {
-            bp.addr += m_elf.base();
-            inject_breakpoint(bp);
-            new_breakpoints.emplace(m_elf.base() + addr, bp);
-        }
-        m_breakpoints = std::move(new_breakpoints);
+        post_spawn();
     }
 }
 
@@ -445,4 +439,103 @@ std::vector<int64_t> Tracee::backtrace() {
         }
     }
     return addresses;
+}
+
+std::optional<uint64_t> Tracee::lookup_sym(std::string_view name) const {
+    std::optional<uint64_t> addr;
+    if ((addr = m_elf.lookup_sym(name))) {
+        return addr;
+    }
+    if (m_dl && (addr = m_dl->lookup_sym(name))) {
+        return addr;
+    }
+    for (const auto& shlib : m_shlibs) {
+        if ((addr = shlib.lookup_sym(name))) {
+            return addr;
+        }
+    }
+    return {};
+}
+
+std::optional<std::pair<uint64_t, uint64_t>> Tracee::find_segment(uint32_t type) {
+    auto phdr_addr = m_auxv.at(AT_PHDR);
+    auto phnum = m_auxv.at(AT_PHNUM);
+    auto phent = m_auxv.at(AT_PHENT);
+    util::throw_assert(phent == sizeof(Elf64_Phdr));
+    Elf64_Phdr phdr;
+    for (size_t i = 0; i < phnum; ++i) {
+        read_memory(phdr_addr + i * phent, &phdr, phent);
+        if (phdr.p_type == type) {
+            return {{m_elf.base() + phdr.p_vaddr, phdr.p_memsz}};
+        }
+    }
+    return {};
+}
+
+std::optional<uint64_t> Tracee::find_dynamic_entry(int64_t tag) {
+    auto [dyn_addr, dyn_size] = m_dyn;
+    Elf64_Dyn dyn;
+    for (size_t i = 0; i < dyn_size / sizeof(dyn); ++i) {
+        read_memory(dyn_addr + i * sizeof(dyn), &dyn, sizeof(dyn));
+        if (dyn.d_tag == tag) {
+            return dyn.d_un.d_val;
+        }
+    }
+    return {};
+}
+
+void Tracee::post_spawn() {
+    char auxv_path[256];
+    snprintf(auxv_path, sizeof(auxv_path), "/proc/%d/auxv", m_child_pid);
+    int auxv_fd = util::throw_errno(open(auxv_path, O_RDONLY));
+    Elf64_auxv_t auxv;
+    for (;;) {
+        auto n = read(auxv_fd, &auxv, sizeof(auxv));
+        util::throw_assert(n == sizeof(auxv));
+        if (auxv.a_type == AT_NULL) {
+            break;
+        }
+        m_auxv.emplace(auxv.a_type, auxv.a_un.a_val);
+    }
+    close(auxv_fd);
+    auto entry = m_auxv.at(AT_ENTRY);
+    m_elf.set_base_from_entry(entry);
+    if (m_elf.base() != 0) {
+        printf("PIE executable (base %#lx)\n", m_elf.base());
+
+        std::unordered_map<size_t, Breakpoint> new_breakpoints;
+        for (auto& [addr, bp] : m_breakpoints) {
+            bp.addr += m_elf.base();
+            inject_breakpoint(bp);
+            new_breakpoints.emplace(m_elf.base() + addr, bp);
+        }
+        m_breakpoints = std::move(new_breakpoints);
+    }
+
+    if (auto interp = m_elf.interp()) {
+        m_dl.emplace(interp->data(), m_auxv.at(AT_BASE));
+        printf("Setting temporary breakpoint at entry point (%#lx)\n", entry);
+        insert_breakpoint(entry);
+        continue_process();
+        m_breakpoints.erase(entry);
+
+        m_dyn = *find_segment(PT_DYNAMIC);
+        auto debug_addr = *find_dynamic_entry(DT_DEBUG);
+        r_debug debug;
+        read_memory(debug_addr, &debug, sizeof(debug));
+        link_map lm;
+        for (auto lm_addr = reinterpret_cast<uint64_t>(debug.r_map); lm_addr != 0;
+             lm_addr = reinterpret_cast<uint64_t>(lm.l_next)) {
+            read_memory(lm_addr, &lm, sizeof(lm));
+            if (!lm.l_prev) {
+                continue;
+            }
+            auto name = read_string(reinterpret_cast<uint64_t>(lm.l_name));
+            if (name == *interp || name == "linux-vdso.so.1") {
+                continue;
+            }
+            printf("Adding shared library %s (%#lx)\n", name.c_str(), lm.l_addr);
+            m_shlibs.emplace_back(name.c_str(), lm.l_addr);
+        }
+    }
 }

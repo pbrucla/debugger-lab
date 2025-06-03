@@ -12,7 +12,6 @@
 #include <vector>
 
 #include "dbg.hpp"
-#include "elf.hpp"
 
 std::optional<Register> Operation::get_register(std::string input) {
     if (input == "r15" || input == "R15")
@@ -79,7 +78,7 @@ std::optional<uint64_t> Operation::get_addr(std::string arg) {
     if (isdigit(arg[0])) {
         return std::stoul(arg, nullptr, 16);
     }
-    auto addr = m_tracee.elf().lookup_sym(arg);
+    auto addr = m_tracee.lookup_sym(arg);
     if (addr) {
         return addr.value();
     }
@@ -125,7 +124,7 @@ void Operation::execute_command(const std::vector<std::string>& arguments) {
         std::cout << "Backtrace:\n";
         for (unsigned long i = 0; i < result.size(); i++) {
             auto addr = result.at(i);
-            auto name = m_tracee.elf().lookup_addr(addr);
+            auto name = m_tracee.lookup_addr(addr);
 
             std::cout << "#" << i << ": 0x" << std::hex << result.at(i) << std::dec;
             if (name.has_value()) {

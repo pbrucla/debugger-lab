@@ -4,6 +4,9 @@
 #include <stdint.h>
 
 #include <array>
+#include <optional>
+#include <string>
+#include <string_view>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -61,6 +64,7 @@ class Tracee {
     void read_memory(size_t addr, void* out, size_t sz);
     // Writes `sz` bytes from address `data` in the current process to address `addr` in the child process.
     void write_memory(size_t addr, const void* data, size_t sz);
+    std::string read_string(uint64_t addr);
     // Inserts a breakpoint at address `addr` in the child process.
     void insert_breakpoint(size_t addr);
     // Prints out a number of disassembled instructions starting from address
@@ -74,7 +78,8 @@ class Tracee {
     std::vector<int64_t> backtrace();
     unsigned long syscall(const unsigned long syscall, const std::array<unsigned long, 6>& args);
 
-    ELF& elf() { return m_elf; }
+    std::optional<uint64_t> lookup_sym(std::string_view name) const;
+    std::optional<std::string_view> lookup_addr(uint64_t addr) const { return m_elf.lookup_addr(addr); }
 
    private:
     struct Breakpoint {
@@ -87,6 +92,9 @@ class Tracee {
     void inject_breakpoint(Breakpoint& bp);
     // Uninjects a breakpoint from a running child process.
     void uninject_breakpoint(Breakpoint& bp);
+    std::optional<std::pair<uint64_t, uint64_t>> find_segment(uint32_t type);
+    std::optional<uint64_t> find_dynamic_entry(int64_t tag);
+    void post_spawn();
 
     static constexpr pid_t NOCHILD = -1;
     bool m_breakpoint_hit = false;
@@ -94,5 +102,8 @@ class Tracee {
     std::unordered_map<size_t, Breakpoint> m_breakpoints;
     std::unordered_map<uint64_t, uint64_t> m_auxv;
     ELF m_elf;
+    std::optional<ELF> m_dl;
+    std::vector<ELF> m_shlibs;
+    std::pair<uint64_t, uint64_t> m_dyn;
     const char* m_pathname;
 };
